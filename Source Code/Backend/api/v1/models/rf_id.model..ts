@@ -3,7 +3,7 @@ import { model, Schema } from "mongoose";
 const rfIdSchema = new Schema(
   {
     rf_id: { type: String, required: true, unique: true },
-    lock_user: { type: Schema.Types.ObjectId, ref: "LockUser", required: true },
+    lock_user_id: { type: Schema.Types.ObjectId, ref: "LockUser", required: true },
   },
   { timestamps: true },
 );

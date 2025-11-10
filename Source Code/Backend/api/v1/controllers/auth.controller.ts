@@ -5,11 +5,12 @@ import jwt from "jsonwebtoken";
 
 const JWT_SECRET = process.env.JWT_SECRET;
 
+// Post api/v1/auth/login
 export const login = async (req: Request, res: Response) => {
   try {
     const { username, password } = req.body;
 
-    const user = await User.findOne({ username, deleted: false }).select("+password +token");
+    const user = await User.findOne({ username }).select("+password +token");
     if (!user) {
       return res.status(404).json({ code: 404, message: "Không tìm thấy người dùng" });
     }
@@ -26,6 +27,8 @@ export const login = async (req: Request, res: Response) => {
   }
 };
 
+
+// Post api/v1/auth/register
 export const register = async (req: Request, res: Response) => {
   try {
     const { username, email, password } = req.body;
