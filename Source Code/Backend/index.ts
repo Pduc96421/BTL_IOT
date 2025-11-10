@@ -10,13 +10,11 @@ import { routeApiV1 } from "./api/v1/routes/index.route";
 
 const port: number | string = process.env.PORT;
 
-import { app, server } from "./config/socket";
+import { io, app, server } from "./socket.io/socket";
 
 app.use(bodyParser.json());
 app.use(cors({ origin: process.env.CORS_ORIGIN, credentials: true }));
 
 routeApiV1(app);
 
-server.listen(port, () => {
-  console.log(`App listening on port ${port}`);
-});
+server.listen(port, () => console.log(`App listening on port ${port}`));

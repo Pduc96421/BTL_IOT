@@ -4,10 +4,10 @@ const accessLogModel = new Schema(
   {
     device_id: { type: Schema.Types.ObjectId, ref: "Device", required: true },
     lock_user_id: { type: Schema.Types.ObjectId, ref: "LockUser" },
-    tag_code: { type: String },
+    rf_code: { type: String },
     face_code: { type: String },
     method: { type: String, required: true },
-    result: { type: String, required: true },
+    result: { type: String, required: true, enum: ["SUCCESS", "FALSE"] },
   },
   { timestamps: true },
 );

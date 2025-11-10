@@ -4,7 +4,6 @@ const accessRuleSchema = new Schema(
   {
     device_id: { type: Schema.Types.ObjectId, ref: "Device", required: true },
     lock_user_id: { type: Schema.Types.ObjectId, ref: "LockUser", required: true },
-    allowed_methods: { type: Object },
   },
   { timestamps: true },
 );
