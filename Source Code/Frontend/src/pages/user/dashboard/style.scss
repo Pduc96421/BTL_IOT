@@ -1,0 +1,375 @@
+.dashboard-page {
+  height: 100vh;
+  background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+  display: flex;
+  flex-direction: column;
+  padding: 20px;
+  overflow-y: auto;
+
+  .dashboard-header {
+    margin-bottom: 30px;
+
+    h1 {
+      margin: 0 0 8px 0;
+      font-size: 32px;
+      font-weight: 700;
+      color: #1a1a1a;
+    }
+
+    p {
+      margin: 0;
+      font-size: 16px;
+      color: #666;
+    }
+  }
+
+  .dashboard-content {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+    flex: 1;
+
+    .left-section {
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+
+      .camera-section {
+        background: white;
+        border-radius: 12px;
+        padding: 20px;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+
+        .camera-feed {
+          .camera-placeholder {
+            background: #000;
+            border-radius: 8px;
+            height: 320px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-direction: column;
+            position: relative;
+            color: white;
+
+            .camera-icon {
+              font-size: 64px;
+              margin-bottom: 16px;
+              opacity: 0.3;
+            }
+
+            .live-badge {
+              position: absolute;
+              top: 16px;
+              left: 16px;
+              background: #fff;
+              color: #000;
+              padding: 4px 8px;
+              border-radius: 4px;
+              font-size: 12px;
+              font-weight: 700;
+            }
+
+            .status-indicator {
+              position: absolute;
+              top: 16px;
+              right: 16px;
+              padding: 6px 12px;
+              border-radius: 20px;
+              font-size: 12px;
+              font-weight: 600;
+
+              &.online {
+                background: #27ae60;
+                color: white;
+
+                &::before {
+                  content: '';
+                  display: inline-block;
+                  width: 6px;
+                  height: 6px;
+                  background: white;
+                  border-radius: 50%;
+                  margin-right: 6px;
+                }
+              }
+            }
+
+            .feed-text {
+              margin: 0;
+              font-size: 28px;
+              font-weight: 700;
+            }
+          }
+
+          .camera-info {
+            margin-top: 12px;
+            font-size: 12px;
+            color: #666;
+            text-align: center;
+          }
+        }
+      }
+
+      .controls-section {
+        background: white;
+        border-radius: 12px;
+        padding: 20px;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+
+        h3 {
+          margin: 0 0 16px 0;
+          font-size: 16px;
+          font-weight: 600;
+          color: #1a1a1a;
+        }
+
+        .button-group {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 12px;
+
+          .control-btn {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            padding: 16px;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+
+            svg {
+              font-size: 20px;
+            }
+
+            &.open {
+              background: #f0f0f0;
+              color: #666;
+
+              &:hover {
+                background: #e0e0e0;
+                transform: translateY(-2px);
+              }
+            }
+
+            &.close {
+              background: #ff4444;
+              color: white;
+
+              &:hover {
+                background: #ee3333;
+                transform: translateY(-2px);
+              }
+            }
+          }
+        }
+      }
+    }
+
+    .right-section {
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+
+      .status-card {
+        background: white;
+        border-radius: 12px;
+        padding: 24px;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        text-align: center;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+
+        .status-icon {
+          font-size: 48px;
+          color: #666;
+          margin-bottom: 12px;
+        }
+
+        h4 {
+          margin: 0 0 8px 0;
+          font-size: 20px;
+          font-weight: 600;
+          color: #1a1a1a;
+        }
+
+        .status-label {
+          margin: 0;
+          font-size: 14px;
+          color: #999;
+        }
+      }
+
+      .info-card {
+        background: white;
+        border-radius: 12px;
+        padding: 20px;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+
+        h4 {
+          margin: 0 0 16px 0;
+          font-size: 16px;
+          font-weight: 600;
+          color: #1a1a1a;
+        }
+
+        .access-info {
+          display: flex;
+          gap: 12px;
+
+          .avatar-small {
+            width: 48px;
+            height: 48px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: 700;
+            flex-shrink: 0;
+          }
+
+          div {
+            flex: 1;
+
+            p {
+              margin: 0 0 4px 0;
+              font-size: 14px;
+              color: #1a1a1a;
+
+              &.access-name {
+                font-weight: 600;
+              }
+
+              &.access-method {
+                font-size: 12px;
+                color: #666;
+              }
+
+              &.access-time {
+                font-size: 12px;
+                color: #999;
+                margin-bottom: 8px;
+              }
+            }
+
+            .access-badge {
+              display: inline-block;
+              background: #27ae60;
+              color: white;
+              font-size: 11px;
+              padding: 4px 8px;
+              border-radius: 4px;
+            }
+          }
+        }
+      }
+
+      .stats-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 12px;
+
+        .stat-item {
+          background: white;
+          border-radius: 12px;
+          padding: 16px;
+          box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+          text-align: center;
+
+          .stat-number {
+            margin: 0;
+            font-size: 28px;
+            font-weight: 700;
+            color: #3498db;
+          }
+
+          .stat-label {
+            margin: 8px 0 4px 0;
+            font-size: 12px;
+            color: #666;
+            font-weight: 600;
+          }
+
+          .stat-change {
+            margin: 0;
+            font-size: 11px;
+            color: #999;
+          }
+        }
+      }
+
+      .quick-stats {
+        background: white;
+        border-radius: 12px;
+        padding: 20px;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+
+        h4 {
+          margin: 0 0 16px 0;
+          font-size: 16px;
+          font-weight: 600;
+          color: #1a1a1a;
+        }
+
+        .quick-stat-row {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          padding: 12px 0;
+          border-bottom: 1px solid #f0f0f0;
+          font-size: 14px;
+          color: #1a1a1a;
+
+          &:last-child {
+            border-bottom: none;
+          }
+
+          .value {
+            color: #27ae60;
+            font-weight: 600;
+          }
+        }
+      }
+    }
+  }
+}
+
+@media (max-width: 1024px) {
+  .dashboard-page {
+    .dashboard-content {
+      grid-template-columns: 1fr;
+    }
+  }
+}
+
+@media (max-width: 768px) {
+  .dashboard-page {
+    padding: 12px;
+
+    .dashboard-header {
+      margin-bottom: 20px;
+
+      h1 {
+        font-size: 24px;
+      }
+    }
+
+    .dashboard-content {
+      gap: 12px;
+
+      .left-section .camera-section .camera-feed .camera-placeholder {
+        height: 240px;
+      }
+
+      .right-section .stats-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+  }
+}

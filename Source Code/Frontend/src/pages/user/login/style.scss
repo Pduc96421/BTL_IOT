@@ -1,0 +1,381 @@
+// login.scss
+// Variables
+$primary-blue: #4B6BA1;
+$primary-blue-hover: #1d4ed8;
+$primary-blue-focus: #4B6BA1;
+$bg-blue-light: #eff6ff;
+$bg-indigo-light: #e0e7ff;
+$error-red: #ef4444;
+$text-dark: #1f2937;
+$text-gray: #4b5563;
+$text-light: #6b7280;
+$text-lighter: #9ca3af;
+$border-gray: #e5e7eb;
+$white: #ffffff;
+$bg-hover: #f9fafb;
+
+$border-radius-sm: 0.75rem;
+$border-radius-md: 0.75rem;
+$border-radius-lg: 1.5rem;
+$border-radius-xl: 1rem;
+
+$shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+$shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+$shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+$shadow-blue: 0 10px 15px -3px rgba(37, 99, 235, 0.3);
+$shadow-blue-hover: 0 20px 25px -5px rgba(37, 99, 235, 0.3);
+
+$transition-all: all 0.3s ease;
+
+// Reset & Base
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+
+// Main Container
+.login-page {
+    min-height: 100vh;
+    background: linear-gradient(to bottom right, $bg-blue-light, $bg-indigo-light);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+
+    .login-wrapper {
+        width: 100%;
+        max-width: 28rem;
+    }
+}
+
+// Logo Section
+.logo-section {
+    text-align: center;
+    margin-bottom: 2rem;
+
+    .logo-container {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 4rem;
+        height: 4rem;
+        background-color: $primary-blue;
+        border-radius: $border-radius-xl;
+        margin-bottom: 1rem;
+        box-shadow: $shadow-lg;
+
+        svg {
+            width: 2rem;
+            height: 2rem;
+            color: $white;
+        }
+    }
+
+    h1 {
+        font-size: 1.875rem;
+        font-weight: 700;
+        color: $text-dark;
+        margin-bottom: 0.5rem;
+    }
+
+    p {
+        color: $text-light;
+    }
+}
+
+// Login Card
+.login-card {
+    background-color: $white;
+    border-radius: $border-radius-lg;
+    box-shadow: $shadow-xl;
+    padding: 2rem;
+
+    form {
+        .form-group {
+            margin-bottom: 1.5rem;
+
+            &:last-of-type {
+                margin-bottom: 0;
+            }
+        }
+    }
+}
+
+// Form Elements
+.form-field {
+    label {
+        display: block;
+        font-size: 0.875rem;
+        font-weight: 600;
+        color: $text-dark;
+        margin-bottom: 0.5rem;
+    }
+
+    .input-container {
+        position: relative;
+
+        .input-icon {
+            position: absolute;
+            top: 50%;
+            left: 1rem;
+            transform: translateY(-50%);
+            pointer-events: none;
+
+            svg {
+                height: 1.25rem;
+                width: 1.25rem;
+                color: $text-lighter;
+            }
+        }
+
+        input {
+            width: 100%;
+            padding: 0.75rem 1rem 0.75rem 3rem;
+            border: 2px solid $border-gray;
+            border-radius: $border-radius-md;
+            font-size: 1rem;
+            outline: none;
+            transition: $transition-all;
+
+            &:focus {
+                border-color: $primary-blue-focus;
+                ring: 2px;
+                ring-color: rgba($primary-blue-focus, 0.5);
+            }
+
+            &.error {
+                border-color: $error-red;
+            }
+
+            &::placeholder {
+                color: $text-lighter;
+            }
+        }
+
+        .password-toggle {
+            position: absolute;
+            top: 50%;
+            right: 1rem;
+            transform: translateY(-50%);
+            background: none;
+            border: none;
+            cursor: pointer;
+            padding: 0;
+            display: flex;
+            align-items: center;
+
+            svg {
+                height: 1.25rem;
+                width: 1.25rem;
+                color: $text-lighter;
+                transition: $transition-all;
+
+                &:hover {
+                    color: $text-light;
+                }
+            }
+        }
+    }
+
+    .error-message {
+        margin-top: 0.25rem;
+        font-size: 0.875rem;
+        color: $error-red;
+    }
+}
+
+// Remember & Forgot
+.form-options {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 1.5rem;
+
+    .remember-me {
+        display: flex;
+        align-items: center;
+        cursor: pointer;
+
+        input[type="checkbox"] {
+            width: 1rem;
+            height: 1rem;
+            color: $primary-blue;
+            border-color: #d1d5db;
+            border-radius: 0.25rem;
+            cursor: pointer;
+
+            &:focus {
+                ring: 2px;
+                ring-color: rgba($primary-blue, 0.5);
+            }
+        }
+
+        span {
+            margin-left: 0.5rem;
+            font-size: 0.875rem;
+            color: $text-dark;
+        }
+    }
+
+    .forgot-link {
+        font-size: 0.875rem;
+        font-weight: 600;
+        color: $primary-blue;
+        text-decoration: none;
+        transition: $transition-all;
+
+        &:hover {
+            color: $primary-blue-hover;
+        }
+    }
+}
+
+// Login Button
+.btn-login {
+    width: 100%;
+    background-color: $primary-blue;
+    color: $white;
+    border-radius: $border-radius-md;
+    font-weight: 600;
+    border: none;
+    cursor: pointer;
+    transition: $transition-all;
+    box-shadow: $shadow-blue;
+    margin: 1rem auto;
+    display: block;
+    padding: 1rem;
+    font-size: 1rem;
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-decoration: none;
+
+    &:hover {
+        background-color: $primary-blue-hover;
+        box-shadow: $shadow-blue-hover;
+    }
+
+    &:focus {
+        outline: none;
+        ring: 4px;
+        ring-color: rgba($primary-blue, 0.3);
+    }
+}
+
+// Divider
+.divider {
+    position: relative;
+    margin: 1.5rem 0;
+
+    .divider-line {
+        position: absolute;
+        top: 50%;
+        left: 0;
+        right: 0;
+        display: flex;
+        align-items: center;
+
+        div {
+            width: 100%;
+            border-top: 1px solid #d1d5db;
+        }
+    }
+
+    .divider-text {
+        position: relative;
+        display: flex;
+        justify-content: center;
+        font-size: 0.875rem;
+
+        span {
+            padding: 0 1rem;
+            background-color: $white;
+            color: $text-light;
+        }
+    }
+}
+
+// Social Login
+.social-login {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 1rem;
+
+    .social-btn {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 0.75rem 1rem;
+        border: 2px solid $border-gray;
+        border-radius: $border-radius-md;
+        background-color: $white;
+        cursor: pointer;
+        transition: $transition-all;
+
+        &:hover {
+            background-color: $bg-hover;
+        }
+
+        svg {
+            width: 1.25rem;
+            height: 1.25rem;
+            margin-right: 0.5rem;
+        }
+
+        span {
+            font-size: 0.875rem;
+            font-weight: 600;
+            color: $text-dark;
+        }
+    }
+}
+
+// Sign Up Link
+.signup-link {
+    margin-top: 2rem;
+    text-align: center;
+    font-size: 0.875rem;
+    color: $text-light;
+
+    a {
+        font-weight: 600;
+        color: $primary-blue;
+        text-decoration: none;
+        transition: $transition-all;
+
+        &:hover {
+            color: $primary-blue-hover;
+        }
+    }
+}
+
+// Footer
+.footer {
+    margin-top: 1.5rem;
+    text-align: center;
+    font-size: 0.75rem;
+    color: $text-light;
+}
+
+// Responsive
+@media (max-width: 640px) {
+    .login-card {
+        padding: 1.5rem;
+    }
+
+    .logo-section {
+        h1 {
+            font-size: 1.5rem;
+        }
+    }
+
+    .social-login {
+        grid-template-columns: 1fr;
+    }
+}
