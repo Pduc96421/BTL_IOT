@@ -4,12 +4,45 @@ import express from "express";
 import { Server } from "socket.io";
 import { WebSocketServer, WebSocket, RawData } from "ws";
 import LockUser from "../api/v1/models/lock_user.model";
+import mqtt from "mqtt"; // 👈 thêm dòng này
 
 const app = express();
 const server = http.createServer(app);
 
 // ============ SOCKET.IO CHO REACT + AI ============
 const io = new Server(server, { cors: { origin: "*" } });
+
+// ============ MQTT KẾT NỐI TỚI BROKER ============
+// const MQTT_URL = "mqtt://192.168.24.126:1883";
+const MQTT_URL = "mqtt://192.168.24.103:1883";
+const mqttClient = mqtt.connect(MQTT_URL);
+
+mqttClient.on("connect", () => {
+  console.log("[MQTT] Connected to broker:", MQTT_URL);
+
+  // Nếu muốn xem trạng thái cửa từ ESP32
+  mqttClient.subscribe("iot/door/status", (err) => {
+    if (!err) console.log("[MQTT] Subscribed to iot/door/status");
+  });
+});
+
+mqttClient.on("error", (err) => {
+  console.error("[MQTT] Error:", err);
+});
+
+// Forward trạng thái cửa cho React (optional)
+mqttClient.on("message", (topic, message) => {
+  const payload = message.toString();
+  // Ví dụ ESP gửi: {"chip_id":"...","door":"CLOSED"|"OPEN"}
+  if (topic === "iot/door/status") {
+    try {
+      const data = JSON.parse(payload);
+      io.emit("door_status", data);
+    } catch {
+      io.emit("door_status", { raw: payload });
+    }
+  }
+});
 
 // ==== COSINE SIMILARITY (Node dùng để nhận diện) ====
 function cosineSimilarity(a: number[], b: number[]): number {
@@ -136,8 +169,17 @@ aiNsp.on("connection", (socket) => {
         bestName = "Unknown";
       }
 
-      console.log("[AI] recognize:", bestName, bestScore.toFixed(3));
+      // console.log("[AI] recognize:", bestName, bestScore.toFixed(3));
       io.emit("recognize_result", { name: bestName, score: bestScore });
+
+      // 🔥 NẾU NHẬN DIỆN ĐƯỢC NGƯỜI HỢP LỆ -> GỬI MQTT MỞ CỬA
+      if (bestName !== "Unknown" && bestName !== "NoFace") {
+        // Optional: log để debug
+        console.log("[MQTT] OPEN DOOR by FaceID user:", bestName);
+
+        mqttClient.publish("iot/rfid/command", "OPEN");
+        // ESP32 sẽ nhận "OPEN" và tự mở khóa giống như RFID
+      }
     } catch (err) {
       console.error("[AI] recognize_embedding error:", err);
     }

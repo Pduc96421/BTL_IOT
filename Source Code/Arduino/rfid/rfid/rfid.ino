@@ -7,15 +7,16 @@ String uidString;
 String chipId;
 
 #include "WiFi.h"
-#include <PubSubClient.h>       // ⭐ MQTT
+#include <PubSubClient.h>  // ⭐ MQTT
 
 // WIFI
-const char* ssid = "cong";
-const char* password = "123456789";
+const char* ssid = "Duc";
+const char* password = "vuthikhanhlinh";
 
 // MQTT ⭐
-const char* mqtt_server = "192.168.24.126";
-const int   mqtt_port   = 1883;
+const char* mqtt_server = "192.168.24.103";
+// const char* mqtt_server = "127.0.0.1";
+const int mqtt_port = 1883;
 WiFiClient espClient;
 PubSubClient client(espClient);
 
@@ -24,20 +25,20 @@ bool btnIOState = HIGH;
 unsigned long timeDelay = millis();
 unsigned long timeDelay2 = millis();
 bool InOutState = 0;
-const int ledIO = 2;            // LED on-board (nếu cần)
-const int buzzer = 5;           // D5 -> GPIO5 -> buzzer
+const int ledIO = 2;   // LED on-board (nếu cần)
+const int buzzer = 5;  // D5 -> GPIO5 -> buzzer
 
 // Relay điều khiển khóa và cảm biến từ cửa
 // Theo wiring bạn mô tả:
 // - Rơ-le: VIN, GND, D26 -> GPIO26
 // - Cảm biến từ: 3V, GND, D4 -> GPIO4 (reed switch kiểu NO + pullup)
-const int relayPin = 26;        // D26
-const int doorSensorPin = 4;    // D4, dùng INPUT_PULLUP
-bool doorClosed = false;        // true = cửa/khóa đang đóng
+const int relayPin = 26;      // D26
+const int doorSensorPin = 4;  // D4, dùng INPUT_PULLUP
+bool doorClosed = false;      // true = cửa/khóa đang đóng
 bool lastDoorClosed = false;
 unsigned long lastDoorCheck = 0;
-unsigned long relayOpenedAt = 0;    // millis khi rơ-le được bật
-const unsigned long RELAY_OPEN_DURATION = 5000; // 5s
+unsigned long relayOpenedAt = 0;                 // millis khi rơ-le được bật
+const unsigned long RELAY_OPEN_DURATION = 5000;  // 5s
 
 // ---------------- MQTT CALLBACK --------------------
 void mqttCallback(char* topic, byte* message, unsigned int length) {
@@ -55,8 +56,8 @@ void mqttCallback(char* topic, byte* message, unsigned int length) {
   if (msg.equalsIgnoreCase("OPEN")) {
     digitalWrite(relayPin, HIGH);  // tùy loại rơ-le, có thể phải đảo lại
     Serial.println("MQTT CMD: OPEN lock");
-    beep(1, 150);                  // kêu khi mở
-    relayOpenedAt = millis();      // bắt đầu tính thời gian auto-close
+    beep(1, 150);              // kêu khi mở
+    relayOpenedAt = millis();  // bắt đầu tính thời gian auto-close
   } else if (msg.equalsIgnoreCase("CLOSE")) {
     digitalWrite(relayPin, LOW);
     Serial.println("MQTT CMD: CLOSE lock");
@@ -72,7 +73,7 @@ void reconnectMQTT() {
     Serial.print("Connecting to MQTT...");
     if (client.connect("esp32_rfid_client")) {
       Serial.println("connected!");
-      client.subscribe("iot/rfid/command");   // optional
+      client.subscribe("iot/rfid/command");  // optional
     } else {
       Serial.print("failed, rc=");
       Serial.println(client.state());
@@ -82,8 +83,7 @@ void reconnectMQTT() {
 }
 
 // ---------------- SEND UID OVER MQTT ----------------
-void publishMQTT(String uid)
-{
+void publishMQTT(String uid) {
   // Gửi cả UID của thẻ và chip_id của thiết bị
   String payload = "{\"uid\":\"" + uid + "\",\"chip_id\":\"" + chipId + "\"}";
   client.publish("iot/rfid/card", payload.c_str());
@@ -91,8 +91,8 @@ void publishMQTT(String uid)
 }
 
 // ---------------- BEEP -------------------
-void beep(int n, int d){
-  for(int i=0;i<n;i++){
+void beep(int n, int d) {
+  for (int i = 0; i < n; i++) {
     digitalWrite(buzzer, HIGH);
     delay(d);
     digitalWrite(buzzer, LOW);
@@ -111,9 +111,9 @@ void setup() {
 
   // Relay & cảm biến cửa
   pinMode(relayPin, OUTPUT);
-  digitalWrite(relayPin, LOW);          // mặc định khóa đóng (tùy wiring của bạn)
+  digitalWrite(relayPin, LOW);  // mặc định khóa đóng (tùy wiring của bạn)
   pinMode(doorSensorPin, INPUT_PULLUP);
-  doorClosed = (digitalRead(doorSensorPin) == LOW);   // LOW = có từ, giả sử là đóng
+  doorClosed = (digitalRead(doorSensorPin) == LOW);  // LOW = có từ, giả sử là đóng
   lastDoorClosed = doorClosed;
 
   Serial.println("Connecting WiFi...");
@@ -142,7 +142,7 @@ void setup() {
 // ---------------- LOOP -------------------
 void loop() {
   if (!client.connected()) reconnectMQTT();
-  client.loop();       // ⭐ MQTT background
+  client.loop();  // ⭐ MQTT background
 
   // Theo dõi trạng thái cửa từ cảm biến từ, nếu đổi trạng thái thì in log (và có thể gửi MQTT)
   if (millis() - lastDoorCheck > 200) {
@@ -183,7 +183,7 @@ void loop() {
 }
 
 // ---------------- READ UID -------------------
-void readUID(){
+void readUID() {
   MFRC522::MIFARE_Key key;
   for (byte i = 0; i < 6; i++) key.keyByte[i] = 0xFF;
 
