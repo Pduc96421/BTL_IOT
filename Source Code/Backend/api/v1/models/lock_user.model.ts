@@ -3,7 +3,7 @@ import { model, Schema } from "mongoose";
 const lockUserSchema = new Schema(
   {
     name: { type: String },
-    role: { type: String },
+    embedding: [Number],
   },
   { timestamps: true },
 );
