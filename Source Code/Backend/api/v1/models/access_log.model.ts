@@ -5,7 +5,6 @@ const accessLogModel = new Schema(
     device_id: { type: Schema.Types.ObjectId, ref: "Device", required: true },
     lock_user_id: { type: Schema.Types.ObjectId, ref: "LockUser" },
     rf_id: { type: String },
-    face_id: { type: String },
     method: { type: String, required: true },
     result: { type: String, required: true, enum: ["SUCCESS", "FALSE"] },
   },
