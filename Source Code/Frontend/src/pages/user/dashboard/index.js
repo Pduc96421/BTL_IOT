@@ -3,24 +3,23 @@
 import React, { memo, useEffect, useState } from "react";
 import "./style.scss";
 import { FiEye, FiLock, FiUnlock } from "react-icons/fi";
-import { io } from "socket.io-client";
-
-const SOCKET_URL = "http://localhost:8080";
-let socket = null;
+import { socket } from "services/socket.service";
+import { api } from "services/api.service";
 
 const DashboardPage = () => {
-  const [doorStatus, setDoorStatus] = useState("closed");
+  const [doorStatus, setDoorStatus] = useState("closed"); // "open" | "closed"
 
   // ==== state cho stream + nhận diện ====
   const [image, setImage] = useState(null);
   const [status, setStatus] = useState("Đang chờ nhận diện...");
 
-  // ==== socket.io: nhận stream + kết quả AI ====
-  useEffect(() => {
-    if (!socket) {
-      socket = io(SOCKET_URL, { transports: ["websocket"] });
-    }
+  // ==== dữ liệu thiết bị + log ====
+  const [currentDevice, setCurrentDevice] = useState(null);
+  const [lastAccess, setLastAccess] = useState(null);
+  const [accessStats, setAccessStats] = useState({ total: 0, success: 0, rate: "0%" });
 
+  // ==== socket.io: nhận stream + kết quả AI + trạng thái cửa ====
+  useEffect(() => {
     // Video từ ESP32
     socket.on("esp_frame", (data) => {
       setImage(data.image);
@@ -39,25 +38,88 @@ const DashboardPage = () => {
       }
     });
 
-    return () => {
-      if (socket) {
-        socket.off("esp_frame");
-        socket.off("recognize_result");
+    // Trạng thái cửa từ cảm biến
+    socket.on("client-door-status", (data) => {
+      if (!data || !data.door) return;
+      const normalized = data.door.toUpperCase() === "OPEN" ? "open" : "closed";
+      setDoorStatus(normalized);
+    });
+
+    // Khi mở bằng RFID
+    socket.on("client-rfid-access", (data) => {
+      if (data?.status === "ALLOWED") {
+        setDoorStatus("open");
       }
+    });
+
+    return () => {
+      socket.off("esp_frame");
+      socket.off("recognize_result");
+      socket.off("client-door-status");
+      socket.off("client-rfid-access");
     };
   }, []);
 
-  const handleDoorControl = (action) => {
-    setDoorStatus(action);
-    // TODO: sau này nếu muốn điều khiển ESP32 thật thì emit lệnh ở đây
-    // socket.emit("door_control", { action }) // ví dụ
+  // Fetch device + access log cho dashboard
+  useEffect(() => {
+    const fetchInitial = async () => {
+      try {
+        // 1) Thiết bị hiện tại (mặc định lấy thiết bị đầu tiên)
+        const devRes = await api.get("/device");
+        const devices = devRes.data?.result || [];
+        if (devices.length > 0) {
+          const d = devices[0];
+          setCurrentDevice(d);
+          setDoorStatus(d.status === "OPEN" ? "open" : "closed");
+        }
+
+        // 2) Lịch sử truy cập
+        const logRes = await api.get("/access_log");
+        const logs = logRes.data?.result || [];
+
+        if (logs.length > 0) {
+          const latest = logs[0];
+          setLastAccess(latest);
+
+          const total = logs.length;
+          const success = logs.filter((l) => l.result === "SUCCESS").length;
+          const rate = total > 0 ? `${Math.round((success / total) * 100)}%` : "0%";
+          setAccessStats({ total, success, rate });
+        }
+      } catch (err) {
+        console.error("Dashboard init error", err);
+      }
+    };
+
+    fetchInitial();
+  }, []);
+
+  const handleDoorControl = async (desired) => {
+    if (!currentDevice) {
+      alert("Chưa có thiết bị nào được cấu hình");
+      return;
+    }
+
+    // Nếu trạng thái hiện tại đã đúng thì không toggle nữa
+    if (desired === "open" && doorStatus === "open") return;
+    if (desired === "closed" && doorStatus === "closed") return;
+
+    try {
+      const res = await api.post(`/device/${currentDevice._id}/switch_door`);
+      const newStatus = res.data?.result?.status || currentDevice.status;
+      setDoorStatus(newStatus === "OPEN" ? "open" : "closed");
+      setCurrentDevice((prev) => (prev ? { ...prev, status: newStatus } : prev));
+    } catch (err) {
+      console.error("Door control error", err);
+      alert("Điều khiển cửa thất bại");
+    }
   };
 
   const quickStats = [
+    { label: "Total Access Logs", value: accessStats.total },
+    { label: "Successful Access", value: accessStats.success },
+    { label: "Success Rate", value: accessStats.rate },
     { label: "Face ID Recognition", status: "Active" },
-    { label: "RFID Scanner", status: "Active" },
-    { label: "Battery Level", value: "87%" },
-    { label: "WiFi Signal", value: "Strong" },
   ];
 
   return (
@@ -97,13 +159,13 @@ const DashboardPage = () => {
           <div className="controls-section">
             <h3>Door Controls</h3>
             <div className="button-group">
-              <button className="control-btn open" onClick={() => handleDoorControl("open")}>
+              <button
+                className="control-btn open"
+                onClick={() => handleDoorControl("open")}
+                disabled={doorStatus === "open" || !currentDevice}
+              >
                 <FiUnlock />
                 Open Door
-              </button>
-              <button className="control-btn close" onClick={() => handleDoorControl("closed")}>
-                <FiLock />
-                Close Door
               </button>
             </div>
           </div>
@@ -115,36 +177,47 @@ const DashboardPage = () => {
           <div className="status-card">
             {doorStatus === "open" ? <FiUnlock className="status-icon" /> : <FiLock className="status-icon" />}
             <h4>{doorStatus === "open" ? "Door Open" : "Door Closed"}</h4>
-            <p className="status-label">Status: {doorStatus === "open" ? "Unlocked" : "Locked"}</p>
+            <p className="status-label">
+              Status: {doorStatus === "open" ? "Unlocked" : "Locked"}{" "}
+              {currentDevice ? `(${currentDevice.name})` : ""}
+            </p>
           </div>
 
-          {/* Last Access (demo, sau có thể nối với log thật) */}
+          {/* Last Access (dữ liệu thật từ access_log) */}
           <div className="info-card">
             <h4>Last Access</h4>
-            <div className="access-info">
-              <div className="avatar-small" style={{ backgroundColor: "#4a90e2" }}>
-                SJ
+            {lastAccess ? (
+              <div className="access-info">
+                <div className="avatar-small" style={{ backgroundColor: "#4a90e2" }}>
+                  {(lastAccess.device_id?.name || "D").slice(0, 2).toUpperCase()}
+                </div>
+                <div>
+                  <p className="access-name">{lastAccess.device_id?.name || "Unknown device"}</p>
+                  <p className="access-method">{lastAccess.method}</p>
+                  <p className="access-time">
+                    {new Date(lastAccess.createdAt).toLocaleString()}
+                  </p>
+                  <span className="access-badge">
+                    {lastAccess.result === "SUCCESS" ? "Authorized Access" : "Access Denied"}
+                  </span>
+                </div>
               </div>
-              <div>
-                <p className="access-name">Sarah Johnson</p>
-                <p className="access-method">Face ID</p>
-                <p className="access-time">Today at 2:47 PM</p>
-                <span className="access-badge">Authorized Access</span>
-              </div>
-            </div>
+            ) : (
+              <p>Chưa có log truy cập nào.</p>
+            )}
           </div>
 
-          {/* Access Stats */}
+          {/* Access Stats (dữ liệu thật) */}
           <div className="stats-grid">
             <div className="stat-item">
-              <p className="stat-number">24</p>
-              <p className="stat-label">Accesses Today</p>
-              <p className="stat-change">↑ 12% from yesterday</p>
+              <p className="stat-number">{accessStats.total}</p>
+              <p className="stat-label">Total Access Logs</p>
+              <p className="stat-change"></p>
             </div>
             <div className="stat-item">
-              <p className="stat-number">98%</p>
+              <p className="stat-number">{accessStats.rate}</p>
               <p className="stat-label">Success Rate</p>
-              <p className="stat-change">Last 30 days</p>
+              <p className="stat-change"></p>
             </div>
           </div>
 

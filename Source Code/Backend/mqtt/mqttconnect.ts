@@ -39,8 +39,30 @@ client.on("message", async (topic: string, message: Buffer) => {
       const door: string | undefined = data.door; // "OPEN" | "CLOSED"
       console.log("[MQTT] Door status update:", chipId, door);
 
-      // Emit realtime cho FE nếu cần
-      io.emit("client-door-status", { chip_id: chipId, door });
+      // Cập nhật trạng thái device trong DB nếu tìm được theo chip_id
+      if (chipId && door) {
+        const device = await Device.findOne({ chip_id: chipId });
+        if (device) {
+          const newStatus: "OPEN" | "CLOSE" =
+            door.toUpperCase() === "OPEN" ? "OPEN" : "CLOSE";
+          if (device.status !== newStatus) {
+            device.status = newStatus;
+            await device.save();
+          }
+
+          // Emit realtime cho FE kèm device_id
+          io.emit("client-door-status", {
+            chip_id: chipId,
+            device_id: device._id.toString(),
+            door,
+          });
+        } else {
+          // Nếu chưa map được device, vẫn emit theo chip_id để FE có thể xử lý
+          io.emit("client-door-status", { chip_id: chipId, door });
+        }
+      } else {
+        io.emit("client-door-status", { chip_id: chipId, door });
+      }
     } catch (e: any) {
       console.error("[MQTT] Door JSON parse error:", e.message);
     }
@@ -135,7 +157,7 @@ client.on("message", async (topic: string, message: Buffer) => {
         const mapping = await DeviceUser.findOne({ device_id: deviceFromChip._id, rf_id: card._id });
         if (mapping) {
           console.log("[MQTT] Thẻ hợp lệ, cho phép mở khóa cho device", deviceFromChip._id.toString());
-          await AccessLog.create({
+          const log = await AccessLog.create({
             device_id: deviceFromChip._id,
             rf_id: uid,
             method: "RFID",
@@ -145,6 +167,18 @@ client.on("message", async (topic: string, message: Buffer) => {
           // Gửi lệnh mở cửa cho ESP32 qua MQTT
           client.publish("iot/rfid/command", "OPEN");
 
+          const logPayload = {
+            _id: log._id,
+            device_id: deviceFromChip._id.toString(),
+            device_name: deviceFromChip.name,
+            rf_id: uid,
+            method: "RFID",
+            result: "SUCCESS",
+            createdAt: log.createdAt,
+          };
+
+          io.emit("client-access-log", logPayload);
+
           io.emit("client-rfid-access", {
             uid,
             device_id: deviceFromChip._id.toString(),
@@ -152,12 +186,25 @@ client.on("message", async (topic: string, message: Buffer) => {
           });
         } else {
           console.log("[MQTT] Thẻ không được gán cho device này, từ chối mở khóa");
-          await AccessLog.create({
+          const log = await AccessLog.create({
             device_id: deviceFromChip._id,
             rf_id: uid,
             method: "RFID",
             result: "FALSE",
           });
+
+          const logPayload = {
+            _id: log._id,
+            device_id: deviceFromChip._id.toString(),
+            device_name: deviceFromChip.name,
+            rf_id: uid,
+            method: "RFID",
+            result: "FALSE",
+            createdAt: log.createdAt,
+          };
+
+          io.emit("client-access-log", logPayload);
+
           io.emit("client-rfid-access", {
             uid,
             device_id: deviceFromChip._id.toString(),
@@ -167,12 +214,24 @@ client.on("message", async (topic: string, message: Buffer) => {
       } else {
         console.log("[MQTT] Không tìm thấy thẻ hoặc thiết bị, từ chối mở khóa");
         if (deviceFromChip) {
-          await AccessLog.create({
+          const log = await AccessLog.create({
             device_id: deviceFromChip._id,
             rf_id: uid,
             method: "RFID",
             result: "FALSE",
           });
+
+          const logPayload = {
+            _id: log._id,
+            device_id: deviceFromChip._id.toString(),
+            device_name: deviceFromChip.name,
+            rf_id: uid,
+            method: "RFID",
+            result: "FALSE",
+            createdAt: log.createdAt,
+          };
+
+          io.emit("client-access-log", logPayload);
         }
         io.emit("client-rfid-access", {
           uid,

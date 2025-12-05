@@ -47,6 +47,20 @@
 .nav-item.active { background: #10b981; color: white; }
 .nav-item.active .nav-icon { filter: brightness(0) invert(1); }
 
+.nav-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.alert-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #e53e3e;
+  box-shadow: 0 0 0 4px rgba(229, 62, 62, 0.35);
+}
+
 @media (max-width: 768px) {
   .app-sidebar { display: none; }
 }

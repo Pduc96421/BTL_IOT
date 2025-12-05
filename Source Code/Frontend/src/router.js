@@ -7,8 +7,8 @@ import DashboardPage from "pages/user/dashboard";
 import HistoryPage from "pages/user/history";
 import UsersPage from "pages/user/users";
 import DevicesPage from "pages/user/devices";
+import AlertsPage from "pages/user/alerts";
 import FaceLock from "pages/user/stream";
-import DevicesDetail from "pages/user/devices_detail";
 
 const RouterCustom = () => {
   const UserRouters = [
@@ -19,6 +19,10 @@ const RouterCustom = () => {
     {
       path: ROUTERS.USER.HISTORY,
       component: <HistoryPage />,
+    },
+    {
+      path: ROUTERS.USER.ALERTS,
+      component: <AlertsPage />,
     },
     {
       path: ROUTERS.USER.USERS,
@@ -43,7 +47,7 @@ const RouterCustom = () => {
     },
     {
       path: ROUTERS.USER.DEVICES_DETAIL,
-      component: <DevicesDetail />
+      component: <DashboardPage />
     }
   ];
   return (
