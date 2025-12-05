@@ -1,97 +1,228 @@
 "use client"
 
-import { memo, useState } from "react"
+import { memo, useEffect, useMemo, useState } from "react"
 import "./style.scss"
-import { FiPlus, FiEdit2, FiTrash2, FiDownload } from "react-icons/fi"
+import { FiPlus, FiTrash2 } from "react-icons/fi"
+import { api } from "services/api.service"
+import { socket } from "services/socket.service"
+
+const colorPalette = ["#3498db", "#27ae60", "#e74c3c", "#f39c12", "#9b59b6"]
 
 const DevicesPage = () => {
-  const [devices, setDevices] = useState([
-    {
-      id: 1,
-      name: "Front Door Lock",
-      model: "ESP32-CAM",
-      version: "v2.1.3",
-      ip: "192.168.1.101",
-      port: "80",
-      status: "Online",
-      uptime: "15 days",
-      location: "Front Door",
-      color: "#3498db",
-    },
-    {
-      id: 2,
-      name: "Garage Door Lock",
-      model: "ESP32-CAM",
-      version: "v2.1.3",
-      ip: "192.168.1.102",
-      port: "80",
-      status: "Online",
-      uptime: "12 days",
-      location: "Garage",
-      color: "#27ae60",
-    },
-    {
-      id: 3,
-      name: "Back Door Lock",
-      model: "ESP32-CAM",
-      version: "v2.1.2",
-      ip: "192.168.1.103",
-      port: "80",
-      status: "Offline",
-      uptime: "0 days",
-      location: "Back Door",
-      color: "#e74c3c",
-    },
-    {
-      id: 4,
-      name: "Side Gate",
-      model: "ESP32-CAM",
-      version: "v2.1.3",
-      ip: "192.168.1.104",
-      port: "80",
-      status: "Online",
-      uptime: "8 days",
-      location: "Side Gate",
-      color: "#f39c12",
-    },
-    {
-      id: 5,
-      name: "Office Door Lock",
-      model: "ESP32-CAM",
-      version: "v2.1.1",
-      ip: "192.168.1.105",
-      port: "80",
-      status: "Offline",
-      uptime: "0 days",
-      location: "Office",
-      color: "#9b59b6",
-    },
-  ])
+  const [devices, setDevices] = useState([])
+  const [creating, setCreating] = useState(false)
+  const [newDeviceName, setNewDeviceName] = useState("")
+  const [rfidScanInfo, setRfidScanInfo] = useState(null)
+  const [rfidRegisterInfo, setRfidRegisterInfo] = useState(null)
+  const [registeringDeviceId, setRegisteringDeviceId] = useState(null)
+  const [deviceRfids, setDeviceRfids] = useState({})
+  const [deletingDeviceId, setDeletingDeviceId] = useState(null)
+  const [openRfidDeviceId, setOpenRfidDeviceId] = useState(null)
 
-  const stats = [
-    { number: 3, label: "Online Devices", color: "#27ae60" },
-    { number: 2, label: "Offline Devices", color: "#e74c3c" },
-    { number: 5, label: "Total Devices", color: "#3498db" },
-    { number: "98%", label: "Uptime Average", color: "#f39c12" },
-  ]
+  const stats = useMemo(() => {
+    const total = devices.length
+    // Tạm thời coi tất cả là Online cho đơn giản (1 device)
+    return [
+      { number: total, label: "Total Devices", color: "#3498db" },
+      { number: total, label: "Online Devices", color: "#27ae60" },
+    ]
+  }, [devices])
 
-  const networkStats = [
-    { icon: "🌐", label: "Network Range", value: "192.168.1.0/24" },
-    { icon: "🔒", label: "Security Protocol", value: "WPA3-PSK" },
-    { icon: "📶", label: "Signal Strength", value: "Excellent (-45 dBm)" },
-  ]
+  const fetchDevices = async () => {
+    try {
+      const res = await api.get("/device")
+      const list = res.data?.result || []
+      const enhanced = list.map((d, idx) => ({
+        ...d,
+        id: d._id,
+        model: "ESP32", // tạm thời mock
+        version: "v1.0.0",
+        ip: "192.168.1.100",
+        port: "1883",
+        status: "Online",
+        uptime: "N/A",
+        location: d.name || `Device ${idx + 1}`,
+        color: colorPalette[idx % colorPalette.length],
+      }))
+      setDevices(enhanced)
+    } catch (error) {
+      console.error("Fetch devices error", error)
+    }
+  }
+
+  const handleCreateDevice = async () => {
+    if (!newDeviceName.trim()) {
+      alert("Vui lòng nhập tên thiết bị")
+      return
+    }
+    setCreating(true)
+    try {
+      await api.post("/device", { name: newDeviceName.trim() })
+      await fetchDevices()
+      setNewDeviceName("")
+    } catch (error) {
+      console.error("Create device error", error)
+      alert("Tạo thiết bị thất bại")
+    } finally {
+      setCreating(false)
+    }
+  }
+
+  const handleDeleteDevice = async (deviceId) => {
+    if (!window.confirm("Bạn có chắc muốn xóa thiết bị này?")) return
+    setDeletingDeviceId(deviceId)
+    try {
+      await api.delete(`/device/${deviceId}`)
+      await fetchDevices()
+    } catch (error) {
+      console.error("Delete device error", error)
+      alert("Xóa thiết bị thất bại")
+    } finally {
+      setDeletingDeviceId(null)
+    }
+  }
+
+  const handleRegisterRfidForDevice = async (deviceId) => {
+    try {
+      const name = window.prompt("Nhập tên/nhãn cho thẻ RFID (ví dụ: Thẻ nhà, Thẻ Bố...):", "")
+      await api.post(`/rf_id/register_mode/${deviceId}`, { name: name || undefined })
+      setRegisteringDeviceId(deviceId)
+      setRfidRegisterInfo({
+        status: "WAITING",
+        message: "Đang chờ bạn quét thẻ trên thiết bị...",
+        device_id: deviceId,
+      })
+    } catch (error) {
+      console.error(error)
+      alert("Bật chế độ đăng ký thẻ thất bại")
+    }
+  }
+
+  const handleViewRfids = async (deviceId) => {
+    // toggle hiển thị: nếu đang mở thì đóng lại
+    if (openRfidDeviceId === deviceId) {
+      setOpenRfidDeviceId(null)
+      return
+    }
+
+    try {
+      const res = await api.get(`/rf_id/device/${deviceId}`)
+      const list = res.data?.result || []
+      setDeviceRfids((prev) => ({ ...prev, [deviceId]: list }))
+      setOpenRfidDeviceId(deviceId)
+    } catch (error) {
+      console.error("Fetch rfids error", error)
+      alert("Lấy danh sách thẻ thất bại")
+    }
+  }
+
+  const handleDeleteRfidFromDevice = async (deviceId, rfidId) => {
+    if (!window.confirm("Bạn có chắc muốn xóa thẻ này khỏi thiết bị?")) return
+    try {
+      await api.delete(`/rf_id/device/${deviceId}/${rfidId}`)
+      setDeviceRfids((prev) => ({
+        ...prev,
+        [deviceId]: (prev[deviceId] || []).filter((r) => r._id !== rfidId),
+      }))
+    } catch (error) {
+      console.error("Delete rfid error", error)
+      alert("Xóa thẻ thất bại")
+    }
+  }
+
+  useEffect(() => {
+    fetchDevices()
+  }, [])
+
+  useEffect(() => {
+    const onScan = (data) => {
+      setRfidScanInfo({
+        uid: data.uid,
+        mode: data.mode,
+        device_id: data.device_id,
+      })
+    }
+
+    const onRegistered = (data) => {
+      setRegisteringDeviceId(null)
+      setRfidRegisterInfo({
+        uid: data.uid,
+        device_id: data.device_id,
+        status: data.status,
+        message:
+          data.status === "CREATED"
+            ? "Đăng ký thẻ mới thành công!"
+            : "Thẻ đã tồn tại trong hệ thống.",
+        name: data.name,
+      })
+
+      // Cập nhật realtime danh sách thẻ cho thiết bị nếu đã được load
+      if (data.device_id && data.status === "CREATED") {
+        setDeviceRfids((prev) => {
+          const current = prev[data.device_id] || []
+          const exists = current.some((r) => r.rf_id === data.uid)
+          if (exists) return prev
+          return {
+            ...prev,
+            [data.device_id]: [
+              ...current,
+              { rf_id: data.uid, name: data.name || undefined, _id: data.uid },
+            ],
+          }
+        })
+      }
+    }
+
+    socket.on("client-rfid-scan", onScan)
+    socket.on("client-rfid-registered", onRegistered)
+
+    return () => {
+      socket.off("client-rfid-scan", onScan)
+      socket.off("client-rfid-registered", onRegistered)
+    }
+  }, [])
 
   return (
     <div className="devices-page">
       <div className="devices-header">
         <div>
           <h1>Device Management</h1>
-          <p>Monitor and configure ESP32-CAM door lock devices</p>
+          <p>Quản lý thiết bị và đăng ký thẻ RFID cho từng thiết bị</p>
         </div>
-        <button className="add-device-btn">
-          <FiPlus />
-          Add Device
-        </button>
+        <div className="devices-header-actions">
+          <input
+            type="text"
+            placeholder="Nhập tên thiết bị mới"
+            value={newDeviceName}
+            onChange={(e) => setNewDeviceName(e.target.value)}
+          />
+          <button className="add-device-btn" onClick={handleCreateDevice} disabled={creating}>
+            <FiPlus />
+            {creating ? "Đang tạo..." : "Add Device"}
+          </button>
+        </div>
+      </div>
+
+      {/* RFID Realtime cho thiết bị */}
+      <div className="rfid-status-panel">
+        <h3>RFID Realtime</h3>
+        {rfidScanInfo ? (
+          <p>
+            <strong>UID vừa quét:</strong> {rfidScanInfo.uid}{" "}
+            <span>({rfidScanInfo.mode === "REGISTER" ? "REGISTER" : "NORMAL"})</span>
+          </p>
+        ) : (
+          <p>Chưa có thẻ nào được quét trong phiên này.</p>
+        )}
+
+        {rfidRegisterInfo && (
+          <p>
+            <strong>Đăng ký:</strong> {rfidRegisterInfo.message}{" "}
+            {rfidRegisterInfo.uid && <span>- UID: {rfidRegisterInfo.uid}</span>}
+          </p>
+        )}
+
+        {registeringDeviceId && <p className="rfid-status-waiting">Đang ở chế độ REGISTER...</p>}
       </div>
 
       {/* Stats Cards */}
@@ -156,40 +287,43 @@ const DevicesPage = () => {
                 </td>
                 <td>
                   <div className="actions-cell">
-                    <button className="action-btn edit">
-                      <FiEdit2 />
+                    <button className="action-btn" onClick={() => handleRegisterRfidForDevice(device.id)}>
+                      {registeringDeviceId === device.id ? "Đang đăng ký RFID..." : "Thêm RFID"}
                     </button>
-                    <button className="action-btn download">
-                      <FiDownload />
+                    <button className="action-btn" onClick={() => handleViewRfids(device.id)}>
+                      Xem thẻ
                     </button>
-                    <button className="action-btn power">
-                      <span>⚡</span>
-                    </button>
-                    <button className="action-btn delete">
+                    <button
+                      className="action-btn delete"
+                      onClick={() => handleDeleteDevice(device.id)}
+                      disabled={deletingDeviceId === device.id}
+                    >
                       <FiTrash2 />
                     </button>
                   </div>
+                  {deviceRfids[device.id] && deviceRfids[device.id].length > 0 && (
+                    <div className="rfid-list">
+                      <strong>RFID đã đăng ký:</strong>
+                      <ul>
+                        {deviceRfids[device.id].map((r) => (
+                          <li key={r._id}>
+                            {r.name ? `${r.name} (${r.rf_id})` : r.rf_id}{" "}
+                            <button
+                              className="rfid-delete-link"
+                              onClick={() => handleDeleteRfidFromDevice(device.id, r._id)}
+                            >
+                              Xóa
+                            </button>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
                 </td>
               </tr>
             ))}
           </tbody>
         </table>
-      </div>
-
-      {/* Network Configuration */}
-      <div className="network-config">
-        <h3>Network Configuration</h3>
-        <div className="network-stats">
-          {networkStats.map((stat, idx) => (
-            <div key={idx} className="network-item">
-              <span className="network-icon">{stat.icon}</span>
-              <div>
-                <p className="network-label">{stat.label}</p>
-                <p className="network-value">{stat.value}</p>
-              </div>
-            </div>
-          ))}
-        </div>
       </div>
     </div>
   )

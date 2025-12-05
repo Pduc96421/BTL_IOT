@@ -3,6 +3,7 @@ import { authRoute } from "./auth.route";
 import { lockUserRoute } from "./lock_user.route";
 import { deviceRoute } from "./device.route";
 import { rfIdRoute } from "./rf_id.route";
+import { accessLogRoute } from "./access_log.route";
 
 export const routeApiV1 = (app: Express): void => {
   const version = "/api/v1";
@@ -10,4 +11,5 @@ export const routeApiV1 = (app: Express): void => {
   app.use(version + "/lock_user", lockUserRoute);
   app.use(version + "/device", deviceRoute);
   app.use(version + "/rf_id", rfIdRoute);
+  app.use(version + "/access_log", accessLogRoute);
 };

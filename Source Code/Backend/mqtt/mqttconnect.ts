@@ -3,22 +3,26 @@
 import * as mqtt from "mqtt";
 import { MqttClient } from "mqtt";
 import RfId from "../api/v1/models/rf_id.model.";
+import Device from "../api/v1/models/device.model";
+import DeviceUser from "../api/v1/models/device_user.model";
+import AccessLog from "../api/v1/models/access_log.model";
 import { getRfidState, clearRegisterMode } from "./rfidState";
 import { io } from "../socket.io/socket";
 
 const MQTT_URL = "mqtt://192.168.24.126:1883";
-const TOPIC = "iot/rfid/card";
+const CARD_TOPIC = "iot/rfid/card";
+const DOOR_TOPIC = "iot/door/status";
 
 const client: MqttClient = mqtt.connect(MQTT_URL);
 
 client.on("connect", () => {
   console.log(`[MQTT] Connected to broker: ${MQTT_URL}`);
 
-  client.subscribe(TOPIC, (err) => {
+  client.subscribe([CARD_TOPIC, DOOR_TOPIC], (err) => {
     if (err) {
       console.error("[MQTT] Subscribe error:", err);
     } else {
-      console.log(`[MQTT] Subscribed to topic: ${TOPIC}`);
+      console.log(`[MQTT] Subscribed to topics: ${CARD_TOPIC}, ${DOOR_TOPIC}`);
     }
   });
 });
@@ -27,61 +31,152 @@ client.on("message", async (topic: string, message: Buffer) => {
   const payload = message.toString();
   console.log(`\n[MQTT] Received from topic "${topic}": ${payload}`);
 
+  // 1) Xử lý trạng thái cửa từ ESP32
+  if (topic === DOOR_TOPIC) {
+    try {
+      const data = JSON.parse(payload);
+      const chipId: string | undefined = data.chip_id;
+      const door: string | undefined = data.door; // "OPEN" | "CLOSED"
+      console.log("[MQTT] Door status update:", chipId, door);
+
+      // Emit realtime cho FE nếu cần
+      io.emit("client-door-status", { chip_id: chipId, door });
+    } catch (e: any) {
+      console.error("[MQTT] Door JSON parse error:", e.message);
+    }
+    return;
+  }
+
+  // 2) Xử lý thẻ RFID
+  if (topic !== CARD_TOPIC) {
+    // unknown topic
+    return;
+  }
+
   try {
     const data = JSON.parse(payload);
     const uid: string = data.uid;
-    console.log("[MQTT] UID =", uid);
+    const chipId: string | undefined = data.chip_id;
+    console.log("[MQTT] UID =", uid, "chip_id =", chipId);
 
-    const { mode, currentLockUserId } = getRfidState();
-    const currentLockUserIdStr = currentLockUserId ? currentLockUserId.toHexString() : null;
+    // Nếu có chip_id, đảm bảo Device tương ứng tồn tại và lưu chip_id vào model
+    // Ưu tiên: nếu có device đã có chip_id => dùng; nếu chưa có, bind chip_id vào 1 device chưa gán chip_id; cuối cùng mới tạo mới
+    let deviceFromChip: InstanceType<typeof Device> | null = null;
+    if (chipId) {
+      // 1. Tìm theo chip_id
+      const existedByChip = await Device.findOne({ chip_id: chipId });
+      if (existedByChip) {
+        deviceFromChip = existedByChip as InstanceType<typeof Device>;
+      } else {
+        // 2. Nếu chưa có, thử gán chip_id vào 1 device chưa cấu hình chip_id (ví dụ device do admin tạo trước)
+        const deviceWithoutChip = await Device.findOne({ chip_id: { $exists: false } });
+        if (deviceWithoutChip) {
+          deviceWithoutChip.chip_id = chipId;
+          await deviceWithoutChip.save();
+          deviceFromChip = deviceWithoutChip as InstanceType<typeof Device>;
+          console.log("[MQTT] Gán chip_id", chipId, "cho device có sẵn", deviceFromChip._id.toString());
+        } else {
+          // 3. Không có device nào phù hợp -> tạo mới
+          const created = await Device.create({ name: `Device ${chipId.slice(-4)}`, chip_id: chipId });
+          console.log("[MQTT] Tạo mới Device cho chip_id", chipId, "=>", created._id.toString());
+          deviceFromChip = created as InstanceType<typeof Device>;
+        }
+      }
+    }
+
+    const { mode, currentDeviceId, pendingName } = getRfidState();
+    const currentDeviceIdStr = currentDeviceId ? currentDeviceId.toHexString() : null;
 
     // Emit realtime cho FE mỗi lần có thẻ quét
     io.emit("client-rfid-scan", {
       uid,
       mode,
-      lock_user_id: currentLockUserIdStr,
+      device_id: currentDeviceIdStr,
     });
 
-    if (mode === "REGISTER" && currentLockUserId) {
-      // Đang ở chế độ đăng ký: lưu thẻ mới cho 1 khóa duy nhất
-      const existed = await RfId.findOne({ rf_id: uid });
-      if (existed) {
-        console.log("[MQTT] Thẻ đã tồn tại, bỏ qua tạo mới");
+    if (mode === "REGISTER" && currentDeviceId) {
+      // Đang ở chế độ đăng ký: lưu thẻ mới cho 1 thiết bị
+      let card = await RfId.findOne({ rf_id: uid });
+      if (!card) {
+        card = await RfId.create({ rf_id: uid, name: pendingName || undefined });
+      } else if (pendingName && card.name !== pendingName) {
+        card.name = pendingName;
+        await card.save();
+      }
+
+      const existedMapping = await DeviceUser.findOne({ device_id: currentDeviceId, rf_id: card._id });
+      if (existedMapping) {
+        console.log("[MQTT] Thẻ đã tồn tại cho thiết bị này, bỏ qua tạo mới mapping");
         // Gui len client thông báo thẻ đã tồn tại
         io.emit("client-rfid-registered", {
           uid,
-          lock_user_id: currentLockUserIdStr,
+          device_id: currentDeviceIdStr,
           status: "EXISTED",
+          name: card.name,
         });
       } else {
-        await RfId.create({ rf_id: uid, lock_user_id: currentLockUserId });
-        console.log("[MQTT] Đăng ký thẻ mới thành công cho lock_user", currentLockUserId.toHexString());
-        // Gui len client thông báo thẻ đã đăng ký thành công1
+        await DeviceUser.create({ device_id: currentDeviceId, rf_id: card._id });
+        console.log("[MQTT] Đăng ký thẻ mới thành công cho device", currentDeviceId.toHexString());
+        // Gui len client thông báo thẻ đã đăng ký thành công
         io.emit("client-rfid-registered", {
           uid,
-          lock_user_id: currentLockUserIdStr,
+          device_id: currentDeviceIdStr,
           status: "CREATED",
+          name: card.name,
         });
       }
 
       // Đăng ký xong thì quay về NORMAL (1 lần quét / 1 lần thêm)
       clearRegisterMode();
     } else {
-      // Chế độ bình thường: kiểm tra thẻ để mở khóa
+      // Chế độ bình thường: kiểm tra thẻ để mở khóa cho đúng thiết bị (dựa trên chip_id)
       const card = await RfId.findOne({ rf_id: uid });
-      if (card) {
-        console.log("[MQTT] Thẻ hợp lệ, cho phép mở khóa cho lock_user", card.lock_user_id.toString());
-        io.emit("client-rfid-access", {
-          uid,
-          lock_user_id: card.lock_user_id.toString(),
-          status: "ALLOWED",
-        });
-        // TODO: nếu cần, emit sang ESP qua socket để mở cửa
+      if (card && deviceFromChip) {
+        const mapping = await DeviceUser.findOne({ device_id: deviceFromChip._id, rf_id: card._id });
+        if (mapping) {
+          console.log("[MQTT] Thẻ hợp lệ, cho phép mở khóa cho device", deviceFromChip._id.toString());
+          await AccessLog.create({
+            device_id: deviceFromChip._id,
+            rf_id: uid,
+            method: "RFID",
+            result: "SUCCESS",
+          });
+
+          // Gửi lệnh mở cửa cho ESP32 qua MQTT
+          client.publish("iot/rfid/command", "OPEN");
+
+          io.emit("client-rfid-access", {
+            uid,
+            device_id: deviceFromChip._id.toString(),
+            status: "ALLOWED",
+          });
+        } else {
+          console.log("[MQTT] Thẻ không được gán cho device này, từ chối mở khóa");
+          await AccessLog.create({
+            device_id: deviceFromChip._id,
+            rf_id: uid,
+            method: "RFID",
+            result: "FALSE",
+          });
+          io.emit("client-rfid-access", {
+            uid,
+            device_id: deviceFromChip._id.toString(),
+            status: "DENIED",
+          });
+        }
       } else {
-        console.log("[MQTT] Thẻ không hợp lệ, từ chối mở khóa");
+        console.log("[MQTT] Không tìm thấy thẻ hoặc thiết bị, từ chối mở khóa");
+        if (deviceFromChip) {
+          await AccessLog.create({
+            device_id: deviceFromChip._id,
+            rf_id: uid,
+            method: "RFID",
+            result: "FALSE",
+          });
+        }
         io.emit("client-rfid-access", {
           uid,
-          lock_user_id: null,
+          device_id: deviceFromChip ? deviceFromChip._id.toString() : null,
           status: "DENIED",
         });
       }
