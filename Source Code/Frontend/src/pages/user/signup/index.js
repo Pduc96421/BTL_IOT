@@ -3,7 +3,7 @@
 import { useState } from "react"
 import { useNavigate } from "react-router-dom"
 import "./style.scss"
-import * as apiService from "../../../services/api.service"
+import api from "../../../services/api.service"
 
 const SignUpPage = () => {
   const [showPassword, setShowPassword] = useState(false)
@@ -70,16 +70,20 @@ const SignUpPage = () => {
     if (Object.keys(newErrors).length === 0) {
       setLoading(true)
       try {
-        const response = await apiService.authAPI.signup(formData.fullName, formData.email, formData.password)
+        const response = await api.post("/auth/register", {
+          username: formData.fullName,
+          email: formData.email,
+          password: formData.password,
+        })
         console.log("[v0] Signup successful:", response.data)
 
-        // Store token
+        // Store token nếu backend trả về
         if (response.data.result?.token) {
           localStorage.setItem("token", response.data.result.token)
           localStorage.setItem("user", JSON.stringify(response.data.result.user))
         }
 
-        navigate("/conversations")
+        navigate("/")
       } catch (error) {
         console.error("[v0] Signup error:", error)
         setErrors({ submit: error.response?.data?.message || "Signup failed" })
@@ -287,7 +291,8 @@ const SignUpPage = () => {
               <label className="agree-terms">
                 <input type="checkbox" name="agreeToTerms" checked={formData.agreeToTerms} onChange={handleChange} />
                 <span>
-                  I agree to the <a href="#">Terms of Service</a> and <a href="#">Privacy Policy</a>
+                  I agree to the <a href="/terms">Terms of Service</a> and{" "}
+                  <a href="/privacy">Privacy Policy</a>
                 </span>
               </label>
               {errors.agreeToTerms && <p className="error-message">{errors.agreeToTerms}</p>}
