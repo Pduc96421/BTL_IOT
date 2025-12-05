@@ -89,7 +89,7 @@ void setup() {
 }
 
 unsigned long lastSend = 0;
-const unsigned long INTERVAL = 100;
+const unsigned long INTERVAL = 200;
 
 void loop() {
   webSocket.loop();

@@ -56,7 +56,40 @@ aiNsp.on("connection", (socket) => {
         return;
       }
 
-      const user = await LockUser.findOneAndUpdate({ name }, { name, embedding }, { upsert: true, new: true });
+      const newEmb = embedding as number[];
+      const users = await LockUser.find().lean();
+
+      const EXIST_THRESHOLD = 0.8;
+
+      let existName: string | null = null;
+      let existScore = -1;
+
+      for (const user of users) {
+        const userEmb = (user as any).embedding as number[];
+        if (!userEmb || !userEmb.length) continue;
+
+        const score = cosineSimilarity(newEmb, userEmb);
+        if (score > existScore) {
+          existScore = score;
+          existName = user.name;
+        }
+      }
+
+      // Nếu tìm được người có khuôn mặt giống trên ngưỡng -> KHÔNG lưu nữa
+      if (existName && existScore >= EXIST_THRESHOLD) {
+        console.log(`[DB] Face already exists as ${existName} (score=${existScore.toFixed(3)}), skip saving`);
+
+        // Gửi cho React biết là đăng ký thất bại vì trùng mặt
+        io.emit("register_failed", {
+          reason: "face_exists",
+          existName,
+          score: existScore,
+        });
+        return;
+      }
+
+      // ----- 3. Không trùng -> lưu user mới (hoặc update theo name) -----
+      const user = await LockUser.findOneAndUpdate({ name }, { name, embedding: newEmb }, { upsert: true, new: true });
 
       console.log("[DB] Saved LockUser:", user?.name);
       io.emit("register_done", { name: user?.name, _id: user?._id });

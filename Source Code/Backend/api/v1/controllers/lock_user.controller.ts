@@ -34,10 +34,28 @@ export const createLockUser = async (req: Request, res: Response) => {
       return res.status(400).json({ code: 400, message: "Thiếu thông tin tên khóa người dùng" });
     }
 
-    startRegisterFace(name);
-
-    return res.status(201).json({ code: 201, message: "Đã bắt đầu đăng ký, hãy để mặt trước camera (ESP32)" });
+    return res.status(201).json({ code: 201, message: "Thêm lock User thanh công" });
   } catch (error: any) {
+    return res.status(500).json({ code: 500, message: "Lỗi máy chủ", error: error.message });
+  }
+};
+
+// Post /lock_user/:lock_user_id/register_face
+export const registerFaceLockUser = async (req: Request, res: Response) => {
+  try {
+    const lock_user_id = req.params.lock_user_id;
+    const lockUser = await LockUser.findById(lock_user_id);
+
+    if (!lockUser) {
+      return res.status(404).json({ code: 404, message: "Không tìm thấy khóa người dùng" });
+    }
+
+    startRegisterFace(lockUser.name);
+
+    return res
+      .status(201)
+      .json({ code: 201, message: "Đã bắt đầu đăng ký lại khuôn mặt, hãy để mặt trước camera (ESP32)" });
+  } catch (error) {
     return res.status(500).json({ code: 500, message: "Lỗi máy chủ", error: error.message });
   }
 };
