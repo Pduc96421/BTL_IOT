@@ -8,6 +8,7 @@ import HistoryPage from "pages/user/history";
 import UsersPage from "pages/user/users";
 import DevicesPage from "pages/user/devices";
 import FaceLock from "pages/user/stream";
+import DevicesDetail from "pages/user/devices_detail";
 
 const RouterCustom = () => {
   const UserRouters = [
@@ -40,6 +41,10 @@ const RouterCustom = () => {
       path: ROUTERS.USER.STREAM,
       component: <FaceLock />,
     },
+    {
+      path: ROUTERS.USER.DEVICES_DETAIL,
+      component: <DevicesDetail />
+    }
   ];
   return (
     <MasterUserLayout>

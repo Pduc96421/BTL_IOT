@@ -5,6 +5,7 @@ import "./style.scss"
 import { FiPlus, FiTrash2 } from "react-icons/fi"
 import { api } from "services/api.service"
 import { socket } from "services/socket.service"
+import { useNavigate } from "react-router-dom"
 
 const colorPalette = ["#3498db", "#27ae60", "#e74c3c", "#f39c12", "#9b59b6"]
 
@@ -18,6 +19,7 @@ const DevicesPage = () => {
   const [deviceRfids, setDeviceRfids] = useState({})
   const [deletingDeviceId, setDeletingDeviceId] = useState(null)
   const [openRfidDeviceId, setOpenRfidDeviceId] = useState(null)
+  const navigate = useNavigate();
 
   const stats = useMemo(() => {
     const total = devices.length
@@ -128,6 +130,10 @@ const DevicesPage = () => {
       console.error("Delete rfid error", error)
       alert("Xóa thẻ thất bại")
     }
+  }
+
+  const handleViewDevice = (deviceId) => {
+    navigate('/devices/' + deviceId);
   }
 
   useEffect(() => {
@@ -292,6 +298,9 @@ const DevicesPage = () => {
                     </button>
                     <button className="action-btn" onClick={() => handleViewRfids(device.id)}>
                       Xem thẻ
+                    </button>
+                    <button className="action-btn" onClick={() => handleViewDevice(device.id)}>
+                      Xem chi tiết
                     </button>
                     <button
                       className="action-btn delete"

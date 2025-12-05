@@ -10,6 +10,7 @@ export const ROUTERS = {
     LOGIN: "/login",
     SIGNUP: "/signup",
     STREAM: "/register_face/:lock_user_id",
+    DEVICES_DETAIL: "/devices/:device_id",
   },
 
   ADMIN: {
