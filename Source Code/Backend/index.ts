@@ -13,7 +13,7 @@ const port: number | string = process.env.PORT;
 import { io, app, server } from "./socket.io/socket";
 
 app.use(bodyParser.json());
-app.use(cors({ origin: process.env.CORS_ORIGIN, credentials: true }));
+app.use(cors({ origin: true, credentials: true }));
 
 routeApiV1(app);
 

@@ -1,5 +1,6 @@
 import { Request, Response } from "express";
 import LockUser from "../models/lock_user.model";
+import { startRegisterFace } from "../../../socket.io/socket";
 
 // Get /lock_user
 export const getListLockUser = async (req: Request, res: Response) => {
@@ -33,9 +34,9 @@ export const createLockUser = async (req: Request, res: Response) => {
       return res.status(400).json({ code: 400, message: "Thiếu thông tin tên khóa người dùng" });
     }
 
-    const lockUser = await LockUser.create({ name });
+    startRegisterFace(name);
 
-    return res.status(201).json({ code: 201, message: "Tạo khóa người dùng thành công" });
+    return res.status(201).json({ code: 201, message: "Đã bắt đầu đăng ký, hãy để mặt trước camera (ESP32)" });
   } catch (error: any) {
     return res.status(500).json({ code: 500, message: "Lỗi máy chủ", error: error.message });
   }

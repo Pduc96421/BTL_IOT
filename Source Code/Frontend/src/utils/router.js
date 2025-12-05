@@ -8,7 +8,8 @@ export const ROUTERS = {
     USERS: "/users",
     HISTORY: "/history",
     LOGIN: "/login",
-    SIGNUP: "/signup"
+    SIGNUP: "/signup",
+    STREAM: "/stream",
   },
 
   ADMIN: {
