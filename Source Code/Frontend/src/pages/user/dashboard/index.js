@@ -1,29 +1,64 @@
-"use client"
+"use client";
 
-import { memo, useState } from "react"
-import "./style.scss"
-import { FiEye, FiLock, FiUnlock } from "react-icons/fi"
+import React, { memo, useEffect, useState } from "react";
+import "./style.scss";
+import { FiEye, FiLock, FiUnlock } from "react-icons/fi";
+import { io } from "socket.io-client";
+
+const SOCKET_URL = "http://localhost:8080";
+let socket = null;
 
 const DashboardPage = () => {
-  const [doorStatus, setDoorStatus] = useState("locked")
+  const [doorStatus, setDoorStatus] = useState("closed");
 
-  const stats = [
-    { label: "Live Camera Feed", value: "Active", color: "#1a1a1a" },
-    { label: "Door Status", value: "Locked", color: "#27ae60" },
-    { label: "Last Access", value: "Sarah Johnson", color: "#3498db" },
-    { label: "Success Rate", value: "98%", color: "#27ae60" },
-  ]
+  // ==== state cho stream + nhận diện ====
+  const [image, setImage] = useState(null);
+  const [status, setStatus] = useState("Đang chờ nhận diện...");
+
+  // ==== socket.io: nhận stream + kết quả AI ====
+  useEffect(() => {
+    if (!socket) {
+      socket = io(SOCKET_URL, { transports: ["websocket"] });
+    }
+
+    // Video từ ESP32
+    socket.on("esp_frame", (data) => {
+      setImage(data.image);
+    });
+
+    // Kết quả nhận diện realtime
+    socket.on("recognize_result", (data) => {
+      const { name, score } = data;
+
+      if (name === "NoFace") {
+        setStatus("Nhận diện: Không thấy khuôn mặt nào trong khung hình.");
+      } else if (name === "Unknown") {
+        setStatus(`Nhận diện: Không nhận ra ai (score=${score.toFixed(2)})`);
+      } else {
+        setStatus(`Nhận diện: ${name} (score=${score.toFixed(2)})`);
+      }
+    });
+
+    return () => {
+      if (socket) {
+        socket.off("esp_frame");
+        socket.off("recognize_result");
+      }
+    };
+  }, []);
+
+  const handleDoorControl = (action) => {
+    setDoorStatus(action);
+    // TODO: sau này nếu muốn điều khiển ESP32 thật thì emit lệnh ở đây
+    // socket.emit("door_control", { action }) // ví dụ
+  };
 
   const quickStats = [
     { label: "Face ID Recognition", status: "Active" },
     { label: "RFID Scanner", status: "Active" },
     { label: "Battery Level", value: "87%" },
     { label: "WiFi Signal", value: "Strong" },
-  ]
-
-  const handleDoorControl = (action) => {
-    setDoorStatus(action)
-  }
+  ];
 
   return (
     <div className="dashboard-page">
@@ -35,16 +70,26 @@ const DashboardPage = () => {
       <div className="dashboard-content">
         {/* Left Column - Camera and Controls */}
         <div className="left-section">
-          {/* Camera Feed */}
+          {/* Camera Feed + Trạng thái nhận diện */}
           <div className="camera-section">
             <div className="camera-feed">
-              <div className="camera-placeholder">
-                <FiEye className="camera-icon" />
-                <span className="live-badge">LIVE</span>
-                <div className="status-indicator online">Online</div>
-                <p className="feed-text">ESP32-CAM Feed</p>
-              </div>
-              <p className="camera-info">Front Door Camera • 1920x1080 • 30fps</p>
+              {image ? (
+                <div className="camera-image-wrapper">
+                  <img src={image} alt="ESP32 frame" className="camera-image" />
+                </div>
+              ) : (
+                <div className="camera-placeholder">
+                  <FiEye className="camera-icon" />
+                  <span className="live-badge">WAITING</span>
+                  <div className="status-indicator offline">No Signal</div>
+                  <p className="feed-text">ESP32-CAM Feed</p>
+                </div>
+              )}
+
+              {/* Trạng thái nhận diện */}
+              <p className="camera-status">
+                <b>Trạng thái:</b> {status}
+              </p>
             </div>
           </div>
 
@@ -68,12 +113,12 @@ const DashboardPage = () => {
         <div className="right-section">
           {/* Door Status */}
           <div className="status-card">
-            <FiLock className="status-icon" />
-            <h4>Door Closed</h4>
-            <p className="status-label">Status: Locked</p>
+            {doorStatus === "open" ? <FiUnlock className="status-icon" /> : <FiLock className="status-icon" />}
+            <h4>{doorStatus === "open" ? "Door Open" : "Door Closed"}</h4>
+            <p className="status-label">Status: {doorStatus === "open" ? "Unlocked" : "Locked"}</p>
           </div>
 
-          {/* Last Access */}
+          {/* Last Access (demo, sau có thể nối với log thật) */}
           <div className="info-card">
             <h4>Last Access</h4>
             <div className="access-info">
@@ -116,7 +161,7 @@ const DashboardPage = () => {
         </div>
       </div>
     </div>
-  )
-}
+  );
+};
 
-export default memo(DashboardPage)
+export default memo(DashboardPage);

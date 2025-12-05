@@ -9,7 +9,7 @@ export const ROUTERS = {
     HISTORY: "/history",
     LOGIN: "/login",
     SIGNUP: "/signup",
-    STREAM: "/stream",
+    STREAM: "/register_face/:lock_user_id",
   },
 
   ADMIN: {

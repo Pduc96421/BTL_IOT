@@ -1,14 +1,15 @@
 import React, { useEffect, useState } from "react";
 import { io } from "socket.io-client";
 import axios from "axios";
+import { useParams } from "react-router-dom"; // 👈 lấy param từ URL
+import "./FaceLock.scss";
 
 const SOCKET_URL = "http://localhost:8080";
-
 let socket = null;
 
 function FaceLock() {
+  const { lock_user_id } = useParams(); // 👈 /lock_user/:lock_user_id/...
   const [image, setImage] = useState(null);
-  const [name, setName] = useState("");
   const [status, setStatus] = useState("Chưa đăng ký");
   const [registering, setRegistering] = useState(false);
 
@@ -17,6 +18,7 @@ function FaceLock() {
       socket = io(SOCKET_URL, { transports: ["websocket"] });
     }
 
+    // Nhận frame từ ESP32
     socket.on("esp_frame", (data) => {
       setImage(data.image);
     });
@@ -30,22 +32,29 @@ function FaceLock() {
       }
     });
 
+    // ĐĂNG KÝ XONG
     socket.on("register_done", (data) => {
       setRegistering(false);
       setStatus(`Đăng ký thành công: ${data.name}`);
     });
 
-    // KẾT QUẢ NHẬN DIỆN
+    // ĐĂNG KÝ THẤT BẠI (trùng mặt / lỗi)
+    socket.on("register_failed", (data) => {
+      if (data.reason === "face_exists") {
+        setRegistering(false);
+        setStatus(`Khuôn mặt này đã tồn tại: ${data.existName} (score=${data.score.toFixed(2)})`);
+        alert(`Khuôn mặt này đã được đăng ký là: ${data.existName}`);
+      } else {
+        setRegistering(false);
+        setStatus("Đăng ký thất bại");
+      }
+    });
+
+    // KẾT QUẢ NHẬN DIỆN (đang không dùng để set status)
     socket.on("recognize_result", (data) => {
       const { name, score } = data;
-
-      if (name === "NoFace") {
-        setStatus("Nhận diện: Không thấy khuôn mặt nào trong khung hình.");
-      } else if (name === "Unknown") {
-        setStatus(`Nhận diện: Không nhận ra ai (score=${score.toFixed(2)})`);
-      } else {
-        setStatus(`Nhận diện: ${name} (score=${score.toFixed(2)})`);
-      }
+      // nếu muốn có thể log ra:
+      // console.log("recognize_result", name, score);
     });
 
     return () => {
@@ -53,6 +62,7 @@ function FaceLock() {
         socket.off("esp_frame");
         socket.off("register_progress");
         socket.off("register_done");
+        socket.off("register_failed");
         socket.off("recognize_result");
       }
     };
@@ -60,8 +70,8 @@ function FaceLock() {
 
   // Gọi API Node để bắt đầu đăng ký
   const handleRegister = async () => {
-    if (!name.trim()) {
-      alert("Bạn phải nhập tên");
+    if (!lock_user_id) {
+      alert("Không tìm thấy lock_user_id trên URL");
       return;
     }
 
@@ -69,9 +79,9 @@ function FaceLock() {
       setRegistering(true);
       setStatus("Đang đăng ký... Hãy nhìn vào camera");
 
-      await axios.post(`${SOCKET_URL}/api/v1/lock_user`, {
-        name,
-      });
+      // ❌ KHÔNG dùng `:id` trong URL thực
+      // ✅ URL thật:
+      await axios.post(`${SOCKET_URL}/api/v1/lock_user/${lock_user_id}/register_face`);
     } catch (err) {
       console.error(err);
       alert("Lỗi khi gọi API register-start");
@@ -80,48 +90,46 @@ function FaceLock() {
   };
 
   return (
-    <div style={{ padding: 20 }}>
-      <h2>Hệ thống khóa cửa bằng khuôn mặt</h2>
+    <div className="face-lock">
+      <div className="face-lock__card">
+        <h2 className="face-lock__title">Đăng ký khuôn mặt</h2>
+        <p className="face-lock__subtitle">
+          Hãy đứng trước camera ESP32-CAM, nhìn thẳng vào camera trong quá trình thu thập.
+        </p>
 
-      {/* Video từ ESP32 */}
-      <div style={{ marginBottom: 20 }}>
-        {image ? <img src={image} alt="ESP32 frame" style={{ width: 300, borderRadius: 8 }} /> : <p>Đang chờ ảnh...</p>}
+        {/* Video từ ESP32 */}
+        <div className="face-lock__video">
+          {image ? (
+            <div className="face-lock__video-wrapper">
+              <img src={image} alt="ESP32 frame" className="face-lock__video-img" />
+              <span className="face-lock__badge face-lock__badge--live">LIVE</span>
+            </div>
+          ) : (
+            <div className="face-lock__video-placeholder">
+              <div className="face-lock__video-icon">📷</div>
+              <p>Đang chờ tín hiệu từ ESP32-CAM...</p>
+            </div>
+          )}
+        </div>
+
+        {/* Status */}
+        <p className="face-lock__status">
+          <b>Trạng thái:</b> {status}
+        </p>
+
+        {/* Button đăng ký khuôn mặt */}
+        <div className="face-lock__form">
+          <button
+            onClick={handleRegister}
+            disabled={registering}
+            className={`face-lock__button ${
+              registering ? "face-lock__button--disabled" : "face-lock__button--primary"
+            }`}
+          >
+            {registering ? "Đang thu thập..." : "Đăng ký khuôn mặt"}
+          </button>
+        </div>
       </div>
-
-      {/* Form đăng ký khuôn mặt */}
-      <div style={{ marginBottom: 10 }}>
-        <input
-          type="text"
-          placeholder="Nhập tên để đăng ký"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          disabled={registering}
-          style={{
-            padding: 8,
-            marginRight: 10,
-            borderRadius: 6,
-            border: "1px solid #ccc",
-          }}
-        />
-        <button
-          onClick={handleRegister}
-          disabled={registering}
-          style={{
-            padding: "8px 15px",
-            borderRadius: 6,
-            background: registering ? "#aaa" : "#007bff",
-            color: "white",
-            border: "none",
-          }}
-        >
-          {registering ? "Đang thu thập..." : "Đăng ký khuôn mặt"}
-        </button>
-      </div>
-
-      {/* Status */}
-      <p>
-        <b>Trạng thái:</b> {status}
-      </p>
     </div>
   );
 }

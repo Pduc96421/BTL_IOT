@@ -70,10 +70,8 @@ client.on("message", async (topic: string, message: Buffer) => {
       // Chế độ bình thường: kiểm tra thẻ để mở khóa
       const card = await RfId.findOne({ rf_id: uid });
       if (card) {
-        console.log("[MQTT] Thẻ hợp lệ, cho phép mở khóa cho lock_user", card.lock_user_id.toString());
         io.emit("client-rfid-access", {
           uid,
-          lock_user_id: card.lock_user_id.toString(),
           status: "ALLOWED",
         });
         // TODO: nếu cần, emit sang ESP qua socket để mở cửa
@@ -81,7 +79,6 @@ client.on("message", async (topic: string, message: Buffer) => {
         console.log("[MQTT] Thẻ không hợp lệ, từ chối mở khóa");
         io.emit("client-rfid-access", {
           uid,
-          lock_user_id: null,
           status: "DENIED",
         });
       }
