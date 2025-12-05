@@ -4,7 +4,6 @@ import { memo, useEffect, useMemo, useState } from "react"
 import "./style.scss"
 import { FiPlus } from "react-icons/fi"
 import { api } from "services/api.service"
-import { socket } from "services/socket.service"
 
 // Tạo avatar từ tên
 const getInitials = (name = "") => {
@@ -20,20 +19,16 @@ const UsersPage = () => {
   const [lockUsers, setLockUsers] = useState([])
   const [creating, setCreating] = useState(false)
   const [newUserName, setNewUserName] = useState("")
-  const [rfidScanInfo, setRfidScanInfo] = useState(null)
-  const [rfidRegisterInfo, setRfidRegisterInfo] = useState(null)
-  const [registeringLockUserId, setRegisteringLockUserId] = useState(null)
 
   const stats = useMemo(() => {
     const total = lockUsers.length
-    const withRfid = lockUsers.filter((u) => u.rfid).length
+    const active = lockUsers.length // tạm coi tất cả là active
     const withFace = lockUsers.filter((u) => u.faceId).length
 
     return [
       { number: total, label: "Total Users", color: "#34495e" },
-      { number: total, label: "Active Users", color: "#3498db" },
+      { number: active, label: "Active Users", color: "#3498db" },
       { number: withFace, label: "Face ID Enabled", color: "#2ecc71" },
-      { number: withRfid, label: "RFID Enabled", color: "#9b59b6" },
     ]
   }, [lockUsers])
 
@@ -49,7 +44,6 @@ const UsersPage = () => {
         avatar: getInitials(u.name || ""),
         color: colorPalette[idx % colorPalette.length],
         faceId: false, // TODO: có thể gọi thêm API face_id để kiểm tra
-        rfid: false, // TODO: có thể check từ rf_id nếu cần
         status: "Active",
         lastAccess: "-",
       }))
@@ -78,54 +72,8 @@ const UsersPage = () => {
     }
   }
 
-  const handleRegisterRfidForUser = async (lockUserId) => {
-    try {
-      await api.post(`/rf_id/register_mode/${lockUserId}`)
-      setRegisteringLockUserId(lockUserId)
-      setRfidRegisterInfo({
-        status: "WAITING",
-        message: "Đang chờ bạn quét thẻ trên thiết bị...",
-        lock_user_id: lockUserId,
-      })
-    } catch (error) {
-      console.error(error)
-      alert("Bật chế độ đăng ký thẻ thất bại")
-    }
-  }
-
   useEffect(() => {
     fetchLockUsers()
-  }, [])
-
-  useEffect(() => {
-    const onScan = (data) => {
-      setRfidScanInfo({
-        uid: data.uid,
-        mode: data.mode,
-        lock_user_id: data.lock_user_id,
-      })
-    }
-
-    const onRegistered = (data) => {
-      setRegisteringLockUserId(null)
-      setRfidRegisterInfo({
-        uid: data.uid,
-        lock_user_id: data.lock_user_id,
-        status: data.status,
-        message:
-          data.status === "CREATED"
-            ? "Đăng ký thẻ mới thành công!"
-            : "Thẻ đã tồn tại trong hệ thống.",
-      })
-    }
-
-    socket.on("client-rfid-scan", onScan)
-    socket.on("client-rfid-registered", onRegistered)
-
-    return () => {
-      socket.off("client-rfid-scan", onScan)
-      socket.off("client-rfid-registered", onRegistered)
-    }
   }, [])
 
   return (
@@ -151,28 +99,6 @@ const UsersPage = () => {
         </div>
       </div>
 
-      {/* Thông tin RFID realtime để test */}
-      <div className="rfid-status-panel">
-        <h3>RFID Realtime</h3>
-        {rfidScanInfo ? (
-          <p>
-            <strong>UID vừa quét:</strong> {rfidScanInfo.uid}{" "}
-            <span>({rfidScanInfo.mode === "REGISTER" ? "REGISTER" : "NORMAL"})</span>
-          </p>
-        ) : (
-          <p>Chưa có thẻ nào được quét trong phiên này.</p>
-        )}
-
-        {rfidRegisterInfo && (
-          <p>
-            <strong>Đăng ký:</strong> {rfidRegisterInfo.message}{" "}
-            {rfidRegisterInfo.uid && <span>- UID: {rfidRegisterInfo.uid}</span>}
-          </p>
-        )}
-
-        {registeringLockUserId && <p className="rfid-status-waiting">Đang ở chế độ REGISTER...</p>}
-      </div>
-
       {/* Stats */}
       <div className="stats-container">
         {stats.map((stat, idx) => (
@@ -190,7 +116,6 @@ const UsersPage = () => {
         <div className="table-columns">
           <div className="column">User</div>
           <div className="column">Face ID</div>
-          <div className="column">RFID</div>
           <div className="column">Status</div>
           <div className="column">Last Access</div>
           <div className="column">Actions</div>
@@ -213,19 +138,14 @@ const UsersPage = () => {
               </span>
             </div>
             <div className="info-cell">
-              <span className={`badge ${user.rfid ? "enabled" : "disabled"}`}>
-                {user.rfid ? "✓ Enabled" : "✗ Disabled"}
-              </span>
-            </div>
-            <div className="info-cell">
               <span className={`status-badge ${user.status.toLowerCase()}`}>{user.status}</span>
             </div>
             <div className="info-cell">
               <span>{user.lastAccess}</span>
             </div>
             <div className="actions-cell">
-              <button className="action-link" onClick={() => handleRegisterRfidForUser(user.id)}>
-                {registeringLockUserId === user.id ? "Đang đăng ký RFID..." : "Thêm RFID"}
+              <button className="action-link" disabled>
+                Thêm RFID (chuyển sang trang Devices)
               </button>
               <button className="action-link" disabled>
                 Thêm Face ID (sắp có)
