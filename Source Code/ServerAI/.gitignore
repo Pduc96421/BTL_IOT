@@ -1,0 +1,25 @@
+# Python venv
+venv/
+env/
+
+# Byte-compiled / cached / compiled files
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Virtual environment metadata
+*.egg-info/
+.eggs/
+
+# Node modules
+node_modules/
+
+# Logs
+*.log
+
+# VSCode settings
+.vscode/
+
+# Local environment variables
+.env
