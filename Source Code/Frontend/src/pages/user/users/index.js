@@ -207,15 +207,10 @@ const UsersPage = () => {
               <span>{user.name}</span>
             </div>
             <div className="info-cell">
-              <span
-                className={`badge ${
-                  Array.isArray(user.embedding) && user.embedding.length > 0 ? "enabled" : "disabled"
-                }`}
-              >
-                {Array.isArray(user.embedding) && user.embedding.length > 0 ? "Đã có Face ID" : "Chưa có Face ID"}
+              <span className={`badge ${user.faceId ? "enabled" : "disabled"}`}>
+                {user.faceId ? "✓ Enabled" : "✗ Disabled"}
               </span>
             </div>
-
             <div className="info-cell">
               <span className={`badge ${user.rfid ? "enabled" : "disabled"}`}>
                 {user.rfid ? "✓ Enabled" : "✗ Disabled"}
@@ -231,7 +226,7 @@ const UsersPage = () => {
               <button className="action-link" onClick={() => handleRegisterRfidForUser(user.id)}>
                 {registeringLockUserId === user.id ? "Đang đăng ký RFID..." : "Thêm RFID"}
               </button>
-              <button onClick={() => navigate(`/register_face/${user._id}`)} className="action-link">
+              <button onClick={() => navigate(`/register_face/${user._id}/`)} className="action-link">
                 Thêm Face ID
               </button>
               {/* TODO: thêm nút xóa / sửa nếu cần */}

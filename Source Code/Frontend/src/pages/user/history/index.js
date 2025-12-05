@@ -1,136 +1,63 @@
 "use client"
 
-import { memo, useState } from "react"
+import { memo, useEffect, useMemo, useState } from "react"
 import "./style.scss"
 import { FiSearch, FiChevronDown } from "react-icons/fi"
+import { api } from "services/api.service"
 
 const HistoryPage = () => {
   const [searchTerm, setSearchTerm] = useState("")
   const [selectedMethod, setSelectedMethod] = useState("all")
   const [selectedResult, setSelectedResult] = useState("all")
   const [currentPage, setCurrentPage] = useState(1)
+  const [records, setRecords] = useState([])
 
-  const accessRecords = [
-    {
-      id: 1,
-      time: "1/15/2024 2:32:00 PM",
-      user: "Sarah Johnson",
-      avatar: "SJ",
-      method: "Face ID",
-      result: "Success",
-      color: "#4a90e2",
-    },
-    {
-      id: 2,
-      time: "1/15/2024 12:15:00 PM",
-      user: "Mike Chen",
-      avatar: "MC",
-      method: "RFID",
-      result: "Success",
-      color: "#50c878",
-    },
-    {
-      id: 3,
-      time: "1/15/2024 9:45:00 AM",
-      user: "Emma Wilson",
-      avatar: "EW",
-      method: "App",
-      result: "Success",
-      color: "#4ecdc4",
-    },
-    {
-      id: 4,
-      time: "1/15/2024 8:22:00 AM",
-      user: "Unknown User",
-      avatar: "UU",
-      method: "Face ID",
-      result: "Failed",
-      color: "#9370db",
-    },
-    {
-      id: 5,
-      time: "1/14/2024 6:30:00 PM",
-      user: "David Brown",
-      avatar: "DB",
-      method: "RFID",
-      result: "Success",
-      color: "#ff6b6b",
-    },
-    {
-      id: 6,
-      time: "1/14/2024 4:45:00 PM",
-      user: "Lisa Garcia",
-      avatar: "LG",
-      method: "App",
-      result: "Success",
-      color: "#ffa500",
-    },
-    {
-      id: 7,
-      time: "1/14/2024 2:12:00 PM",
-      user: "John Smith",
-      avatar: "JS",
-      method: "Face ID",
-      result: "Failed",
-      color: "#87ceeb",
-    },
-    {
-      id: 8,
-      time: "1/14/2024 11:28:00 AM",
-      user: "Anna Taylor",
-      avatar: "AT",
-      method: "RFID",
-      result: "Success",
-      color: "#ff69b4",
-    },
-    {
-      id: 9,
-      time: "1/14/2024 9:15:00 AM",
-      user: "Tom Anderson",
-      avatar: "TA",
-      method: "App",
-      result: "Success",
-      color: "#20b2aa",
-    },
-    {
-      id: 10,
-      time: "1/13/2024 8:45:00 PM",
-      user: "Sarah Johnson",
-      avatar: "SJ",
-      method: "Face ID",
-      result: "Success",
-      color: "#4a90e2",
-    },
-    {
-      id: 11,
-      time: "1/13/2024 5:22:00 PM",
-      user: "Unknown User",
-      avatar: "UU",
-      method: "RFID",
-      result: "Failed",
-      color: "#9370db",
-    },
-    {
-      id: 12,
-      time: "1/13/2024 3:10:00 PM",
-      user: "Mike Chen",
-      avatar: "MC",
-      method: "App",
-      result: "Success",
-      color: "#50c878",
-    },
-  ]
+  const stats = useMemo(() => {
+    const total = records.length
+    const success = records.filter((r) => r.result === "SUCCESS").length
+    const failed = records.filter((r) => r.result === "FALSE").length
+    return [
+      { number: success, label: "Successful Access", bgColor: "#e3f2fd" },
+      { number: failed, label: "Failed Attempts", bgColor: "#ffebee" },
+      { number: total, label: "Total Records", bgColor: "#e8f5e9" },
+    ]
+  }, [records])
 
-  const stats = [
-    { number: 9, label: "Successful Access", bgColor: "#e3f2fd" },
-    { number: 3, label: "Failed Attempts", bgColor: "#ffebee" },
-    { number: 12, label: "Total Records", bgColor: "#e8f5e9" },
-  ]
+  const fetchHistory = async () => {
+    try {
+      const res = await api.get("/access_log")
+      const list = res.data?.result || []
+      const mapped = list.map((item) => {
+        const resultCode = item.result || "SUCCESS" // "SUCCESS" | "FALSE"
+        const resultLabel = resultCode === "SUCCESS" ? "Success" : "Failed"
+        return {
+          id: item._id,
+          time: new Date(item.createdAt).toLocaleString(),
+          // Hiện tại chưa map được user, chỉ có device + rf_id
+          user: item.device_id?.name || "Unknown",
+          avatar: (item.device_id?.name || "D").slice(0, 2).toUpperCase(),
+          method: (item.method || "RFID").toUpperCase(),
+          result: resultCode,
+          resultLabel,
+          color: "#4a90e2",
+        }
+      })
+      setRecords(mapped)
+    } catch (error) {
+      console.error("Fetch access_log error", error)
+    }
+  }
 
-  const filteredRecords = accessRecords.filter((record) => {
+  useEffect(() => {
+    fetchHistory()
+  }, [])
+
+  const filteredRecords = records.filter((record) => {
     const matchesSearch = record.user.toLowerCase().includes(searchTerm.toLowerCase())
-    const matchesMethod = selectedMethod === "all" || record.method.toLowerCase() === selectedMethod.toLowerCase()
-    const matchesResult = selectedResult === "all" || record.result.toLowerCase() === selectedResult.toLowerCase()
+    const matchesMethod =
+      selectedMethod === "all" || record.method.toLowerCase() === selectedMethod.toLowerCase()
+    const matchesResult =
+      selectedResult === "all" || record.resultLabel.toLowerCase() === selectedResult.toLowerCase()
     return matchesSearch && matchesMethod && matchesResult
   })
 
@@ -252,7 +179,9 @@ const HistoryPage = () => {
                   </div>
                 </td>
                 <td>
-                  <span className={`result-badge ${record.result.toLowerCase()}`}>{record.result}</span>
+                  <span className={`result-badge ${record.resultLabel.toLowerCase()}`}>
+                    {record.resultLabel}
+                  </span>
                 </td>
               </tr>
             ))}
