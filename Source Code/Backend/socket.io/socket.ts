@@ -98,7 +98,7 @@ aiNsp.on("connection", (socket) => {
         }
       }
 
-      const THRESHOLD = 0.9;
+      const THRESHOLD = 0.85;
       if (bestScore < THRESHOLD) {
         bestName = "Unknown";
       }
