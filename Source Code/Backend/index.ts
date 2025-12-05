@@ -2,7 +2,7 @@ import * as database from "./config/database";
 import dotenv from "dotenv";
 import bodyParser from "body-parser";
 import cors from "cors";
-
+import './mqtt/mqttconnect'; 
 dotenv.config();
 database.connect();
 
