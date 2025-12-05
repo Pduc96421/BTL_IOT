@@ -7,6 +7,7 @@ export const ROUTERS = {
     DEVICES: "/devices",
     USERS: "/users",
     HISTORY: "/history",
+    ALERTS: "/alerts",
     LOGIN: "/login",
     SIGNUP: "/signup",
     STREAM: "/register_face/:lock_user_id",

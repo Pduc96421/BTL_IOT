@@ -1,5 +1,6 @@
 import { Request, Response } from "express";
 import Device from "../models/device.model";
+import mqttClient from "../../../mqtt/mqttconnect";
 
 // Get /device
 export const getListDevice = async (req: Request, res: Response) => {
@@ -96,7 +97,13 @@ export const switchDoorDevice = async (req: Request, res: Response) => {
     device.status = status;
     await device.save();
 
-    res.status(200).json({ code: 200, message: "Chuyển đổi chế độ thành công" });
+    // Gửi lệnh điều khiển cửa tới ESP32
+    const cmd = status === "OPEN" ? "OPEN" : "CLOSE";
+    mqttClient.publish("iot/rfid/command", cmd);
+
+    res
+      .status(200)
+      .json({ code: 200, message: "Chuyển đổi trạng thái cửa thành công", result: device });
   } catch (error: any) {
     return res.status(500).json({ code: 500, message: "Lỗi máy chủ", error: error.message });
   }
