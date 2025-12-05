@@ -1,35 +1,48 @@
-"use client"
+"use client";
 
-import { memo, useEffect, useMemo, useState } from "react"
-import "./style.scss"
-import { FiSearch, FiChevronDown } from "react-icons/fi"
-import { api } from "services/api.service"
+import { memo, useEffect, useMemo, useState } from "react";
+import "./style.scss";
+import { FiSearch, FiChevronDown } from "react-icons/fi";
+import { api } from "services/api.service";
 
 const HistoryPage = () => {
-  const [searchTerm, setSearchTerm] = useState("")
-  const [selectedMethod, setSelectedMethod] = useState("all")
-  const [selectedResult, setSelectedResult] = useState("all")
-  const [currentPage, setCurrentPage] = useState(1)
-  const [records, setRecords] = useState([])
+  const [searchTerm, setSearchTerm] = useState("");
+  const [selectedMethod, setSelectedMethod] = useState("all");
+  const [selectedResult, setSelectedResult] = useState("all");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [records, setRecords] = useState([]);
 
   const stats = useMemo(() => {
-    const total = records.length
-    const success = records.filter((r) => r.result === "SUCCESS").length
-    const failed = records.filter((r) => r.result === "FALSE").length
+    const total = records.length;
+    const success = records.filter((r) => r.result === "SUCCESS").length;
+    const failed = records.filter((r) => r.result === "FALSE").length;
     return [
       { number: success, label: "Successful Access", bgColor: "#e3f2fd" },
       { number: failed, label: "Failed Attempts", bgColor: "#ffebee" },
       { number: total, label: "Total Records", bgColor: "#e8f5e9" },
-    ]
-  }, [records])
+    ];
+  }, [records]);
 
   const fetchHistory = async () => {
     try {
-      const res = await api.get("/access_log")
-      const list = res.data?.result || []
+      const res = await api.get("/access_log");
+      const list = res.data?.result || [];
       const mapped = list.map((item) => {
-        const resultCode = item.result || "SUCCESS" // "SUCCESS" | "FALSE"
-        const resultLabel = resultCode === "SUCCESS" ? "Success" : "Failed"
+        const resultCode = item.result || "SUCCESS"; // "SUCCESS" | "FALSE"
+        const resultLabel = resultCode === "SUCCESS" ? "Success" : "Failed";
+
+        // Chuẩn hóa method
+        const rawMethod = (item.method || "RFID").toLowerCase();
+        let methodLabel = "RFID";
+
+        if (rawMethod === "face id" || rawMethod === "faceid" || rawMethod === "face") {
+          methodLabel = "Face ID";
+        } else if (rawMethod === "app") {
+          methodLabel = "App";
+        } else {
+          methodLabel = "RFID";
+        }
+
         return {
           id: item._id,
           time: new Date(item.createdAt).toLocaleString(),
@@ -40,43 +53,65 @@ const HistoryPage = () => {
           result: resultCode,
           resultLabel,
           color: "#4a90e2",
-        }
-      })
-      setRecords(mapped)
+        };
+      });
+      setRecords(mapped);
     } catch (error) {
-      console.error("Fetch access_log error", error)
+      console.error("Fetch access_log error", error);
     }
-  }
+  };
 
   useEffect(() => {
-    fetchHistory()
-  }, [])
+    fetchHistory();
+  }, []);
 
   const filteredRecords = records.filter((record) => {
-    const matchesSearch = record.user.toLowerCase().includes(searchTerm.toLowerCase())
-    const matchesMethod =
-      selectedMethod === "all" || record.method.toLowerCase() === selectedMethod.toLowerCase()
-    const matchesResult =
-      selectedResult === "all" || record.resultLabel.toLowerCase() === selectedResult.toLowerCase()
-    return matchesSearch && matchesMethod && matchesResult
-  })
+    const matchesSearch = record.user.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesMethod = selectedMethod === "all" || record.method.toLowerCase() === selectedMethod.toLowerCase();
+    const matchesResult = selectedResult === "all" || record.resultLabel.toLowerCase() === selectedResult.toLowerCase();
+    return matchesSearch && matchesMethod && matchesResult;
+  });
 
-  const itemsPerPage = 10
-  const totalPages = Math.ceil(filteredRecords.length / itemsPerPage)
-  const paginatedRecords = filteredRecords.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage)
+  const itemsPerPage = 10;
+  const totalPages = Math.ceil(filteredRecords.length / itemsPerPage);
+  const paginatedRecords = filteredRecords.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+
+  const methodLabel = useMemo(() => {
+    switch (selectedMethod) {
+      case "face id":
+        return "Face ID";
+      case "rfid":
+        return "RFID";
+      case "app":
+        return "App";
+      default:
+        return "All Methods";
+    }
+  }, [selectedMethod]);
+
+  const resultLabel = useMemo(() => {
+    switch (selectedResult) {
+      case "success":
+        return "Success";
+      case "failed":
+        return "Failed";
+      default:
+        return "All Results";
+    }
+  }, [selectedResult]);
 
   const getMethodIcon = (method) => {
     switch (method) {
       case "Face ID":
-        return "👤"
+        return "👤";
       case "RFID":
-        return "📳"
+        return "📳";
       case "App":
-        return "📱"
+        return "📱";
       default:
-        return "🔒"
+        return "🔒";
     }
-  }
+  };
 
   return (
     <div className="history-page">
@@ -104,8 +139,8 @@ const HistoryPage = () => {
             placeholder="Search by user name..."
             value={searchTerm}
             onChange={(e) => {
-              setSearchTerm(e.target.value)
-              setCurrentPage(1)
+              setSearchTerm(e.target.value);
+              setCurrentPage(1);
             }}
           />
         </div>
@@ -113,7 +148,7 @@ const HistoryPage = () => {
         <div className="filter-dropdowns">
           <div className="dropdown">
             <button className="dropdown-btn">
-              All Methods
+              {methodLabel}
               <FiChevronDown />
             </button>
             <div className="dropdown-menu">
@@ -126,7 +161,7 @@ const HistoryPage = () => {
 
           <div className="dropdown">
             <button className="dropdown-btn">
-              All Results
+              {resultLabel}
               <FiChevronDown />
             </button>
             <div className="dropdown-menu">
@@ -139,9 +174,9 @@ const HistoryPage = () => {
           <button
             className="clear-filters-btn"
             onClick={() => {
-              setSearchTerm("")
-              setSelectedMethod("all")
-              setSelectedResult("all")
+              setSearchTerm("");
+              setSelectedMethod("all");
+              setSelectedResult("all");
             }}
           >
             Clear Filters
@@ -179,9 +214,7 @@ const HistoryPage = () => {
                   </div>
                 </td>
                 <td>
-                  <span className={`result-badge ${record.resultLabel.toLowerCase()}`}>
-                    {record.resultLabel}
-                  </span>
+                  <span className={`result-badge ${record.resultLabel.toLowerCase()}`}>{record.resultLabel}</span>
                 </td>
               </tr>
             ))}
@@ -221,7 +254,7 @@ const HistoryPage = () => {
         </div>
       </div>
     </div>
-  )
-}
+  );
+};
 
-export default memo(HistoryPage)
+export default memo(HistoryPage);

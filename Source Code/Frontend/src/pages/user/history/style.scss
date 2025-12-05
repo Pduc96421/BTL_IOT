@@ -176,6 +176,35 @@
     flex: 1;
     margin-bottom: 20px;
 
+    /* 👇 giới hạn chiều cao + cho phép cuộn */
+    max-height: 420px; // tùy bạn, 350–500px đều ổn
+    overflow-y: auto;
+
+    /* scrollbar cho đẹp (optional) */
+    &::-webkit-scrollbar {
+      width: 6px;
+    }
+    &::-webkit-scrollbar-track {
+      background: transparent;
+    }
+    &::-webkit-scrollbar-thumb {
+      background: #4b5563;
+      border-radius: 999px;
+    }
+
+    .records-table {
+      width: 100%;
+      border-collapse: collapse;
+      min-width: 500px;
+
+      thead th {
+        position: sticky; // 👇 giữ header dính trên cùng khi cuộn
+        top: 0;
+        background: #020617;
+        z-index: 1;
+      }
+    }
+
     .records-table {
       width: 100%;
       border-collapse: collapse;
@@ -338,7 +367,8 @@
     .records-table-container .records-table {
       font-size: 12px;
 
-      th, td {
+      th,
+      td {
         padding: 12px 8px;
       }
     }

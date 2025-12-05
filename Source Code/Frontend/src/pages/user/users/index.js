@@ -150,28 +150,6 @@ const UsersPage = () => {
         </div>
       </div>
 
-      {/* Thông tin RFID realtime để test */}
-      <div className="rfid-status-panel">
-        <h3>RFID Realtime</h3>
-        {rfidScanInfo ? (
-          <p>
-            <strong>UID vừa quét:</strong> {rfidScanInfo.uid}{" "}
-            <span>({rfidScanInfo.mode === "REGISTER" ? "REGISTER" : "NORMAL"})</span>
-          </p>
-        ) : (
-          <p>Chưa có thẻ nào được quét trong phiên này.</p>
-        )}
-
-        {rfidRegisterInfo && (
-          <p>
-            <strong>Đăng ký:</strong> {rfidRegisterInfo.message}{" "}
-            {rfidRegisterInfo.uid && <span>- UID: {rfidRegisterInfo.uid}</span>}
-          </p>
-        )}
-
-        {registeringLockUserId && <p className="rfid-status-waiting">Đang ở chế độ REGISTER...</p>}
-      </div>
-
       {/* Stats */}
       <div className="stats-container">
         {stats.map((stat, idx) => (
@@ -189,7 +167,6 @@ const UsersPage = () => {
         <div className="table-columns">
           <div className="column">User</div>
           <div className="column">Face ID</div>
-          <div className="column">RFID</div>
           <div className="column">Status</div>
           <div className="column">Last Access</div>
           <div className="column">Actions</div>
@@ -207,13 +184,12 @@ const UsersPage = () => {
               <span>{user.name}</span>
             </div>
             <div className="info-cell">
-              <span className={`badge ${user.faceId ? "enabled" : "disabled"}`}>
-                {user.faceId ? "✓ Enabled" : "✗ Disabled"}
-              </span>
-            </div>
-            <div className="info-cell">
-              <span className={`badge ${user.rfid ? "enabled" : "disabled"}`}>
-                {user.rfid ? "✓ Enabled" : "✗ Disabled"}
+              <span
+                className={`badge ${
+                  Array.isArray(user.embedding) && user.embedding.length > 0 ? "enabled" : "disabled"
+                }`}
+              >
+                {Array.isArray(user.embedding) && user.embedding.length > 0 ? "Đã có Face ID" : "Chưa có Face ID"}
               </span>
             </div>
             <div className="info-cell">
@@ -223,9 +199,6 @@ const UsersPage = () => {
               <span>{user.lastAccess}</span>
             </div>
             <div className="actions-cell">
-              <button className="action-link" onClick={() => handleRegisterRfidForUser(user.id)}>
-                {registeringLockUserId === user.id ? "Đang đăng ký RFID..." : "Thêm RFID"}
-              </button>
               <button onClick={() => navigate(`/register_face/${user._id}/`)} className="action-link">
                 Thêm Face ID
               </button>
