@@ -130,6 +130,8 @@ def on_frame(data):
         print("[AI] frame: thiếu image")
         return
 
+    chip_cam_id = data.get("chip_cam_id")
+
     emb = embedding_from_base64_jpeg(b64_img)
 
     # ====== KHÔNG THẤY MẶT ======
@@ -203,7 +205,7 @@ def on_frame(data):
     # --- MODE NHẬN DIỆN TỰ ĐỘNG ---
     sio.emit(
         "recognize_embedding",
-        {"embedding": emb.tolist()},
+        {"embedding": emb.tolist(), chip_cam_id: chip_cam_id},
         namespace="/ai",
     )
 

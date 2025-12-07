@@ -8,6 +8,4 @@ route.get("/:lock_user_id", lockUserController.getLockUser);
 route.post("/", lockUserController.createLockUser);
 route.delete("/:lock_user_id", lockUserController.deletedLockUser);
 route.post("/:lock_user_id/register_face", lockUserController.registerFaceLockUser);
-route.post("/:lock_user_id/register_to_device", lockUserController.registerUserToDevice);
-
 export const lockUserRoute = route;
