@@ -3,8 +3,12 @@ import http from "http";
 import express from "express";
 import { Server } from "socket.io";
 import { WebSocketServer, WebSocket, RawData } from "ws";
+import mqtt from "mqtt";
+
 import LockUser from "../api/v1/models/lock_user.model";
-import mqtt from "mqtt"; // 👈 thêm dòng này
+import Device from "../api/v1/models/device.model"; // 👈 để lưu chip_cam_id
+import DeviceUser from "../api/v1/models/device_user.model";
+import AccessLog from "../api/v1/models/access_log.model";
 
 const app = express();
 const server = http.createServer(app);
@@ -13,16 +17,22 @@ const server = http.createServer(app);
 const io = new Server(server, { cors: { origin: "*" } });
 
 // ============ MQTT KẾT NỐI TỚI BROKER ============
-// const MQTT_URL = "mqtt://192.168.24.126:1883";
 const MQTT_URL = "mqtt://192.168.24.103:1883";
 const mqttClient = mqtt.connect(MQTT_URL);
+
+// topic ESP32-CAM gửi chip_cam_id
+const CAM_ONLINE_TOPIC = "iot/cam/online";
 
 mqttClient.on("connect", () => {
   console.log("[MQTT] Connected to broker:", MQTT_URL);
 
-  // Nếu muốn xem trạng thái cửa từ ESP32
-  mqttClient.subscribe("iot/door/status", (err) => {
-    if (!err) console.log("[MQTT] Subscribed to iot/door/status");
+  // Subcribe topic ESP32-CAM báo online + chip_cam_id
+  mqttClient.subscribe(CAM_ONLINE_TOPIC, (err) => {
+    if (err) {
+      console.error("[MQTT] Subscribe cam online error:", err);
+    } else {
+      console.log("[MQTT] Subscribed to", CAM_ONLINE_TOPIC);
+    }
   });
 });
 
@@ -30,17 +40,51 @@ mqttClient.on("error", (err) => {
   console.error("[MQTT] Error:", err);
 });
 
-// Forward trạng thái cửa cho React (optional)
-mqttClient.on("message", (topic, message) => {
+// Nhận chip_cam_id từ ESP32-CAM qua MQTT
+mqttClient.on("message", async (topic, message) => {
   const payload = message.toString();
-  // Ví dụ ESP gửi: {"chip_id":"...","door":"CLOSED"|"OPEN"}
-  if (topic === "iot/door/status") {
-    try {
-      const data = JSON.parse(payload);
-      io.emit("door_status", data);
-    } catch {
-      io.emit("door_status", { raw: payload });
+
+  if (topic !== CAM_ONLINE_TOPIC) return;
+
+  try {
+    const data = JSON.parse(payload);
+    const chip_cam_id: string | undefined = data.chip_cam_id;
+
+    if (!chip_cam_id) {
+      console.warn("[MQTT] cam_online missing chip_cam_id");
+      return;
     }
+
+    console.log("[MQTT] CAM ONLINE, chip_cam_id =", chip_cam_id);
+
+    // ====== BIND chip_cam_id VÀO DEVICE ======
+    // Ưu tiên:
+    // 1. Nếu đã có device nào có chip_cam_id này -> dùng luôn
+    // 2. Nếu không, tìm 1 device chưa có chip_cam_id để gán
+    // 3. Nếu vẫn không có -> tạo mới device
+
+    let device = await Device.findOne({ chip_cam_id });
+
+    if (!device) {
+      device = await Device.findOne({ chip_cam_id: { $exists: false } });
+
+      if (device) {
+        device.chip_cam_id = chip_cam_id;
+        await device.save();
+        console.log("[MQTT] Gán chip_cam_id", chip_cam_id, "cho device", device._id.toString());
+      }
+    } else {
+      console.log("[MQTT] Cam đã gắn với device", device._id.toString());
+    }
+
+    // Emit realtime cho FE biết con cam nào online + map với device nào
+    io.emit("cam_online", {
+      chip_cam_id,
+      device_id: device._id.toString(),
+      device_name: device.name,
+    });
+  } catch (e: any) {
+    console.error("[MQTT] cam_online JSON parse error:", e.message, "raw:", payload);
   }
 });
 
@@ -59,6 +103,9 @@ function cosineSimilarity(a: number[], b: number[]): number {
   if (denom === 0) return -1;
   return dot / denom;
 }
+
+let lastRecognizeAt = 0;
+const RECOGNIZE_COUNTDOWN = 5000; // 5s
 
 // Namespace cho AI server (Python)
 const aiNsp = io.of("/ai");
@@ -112,7 +159,6 @@ aiNsp.on("connection", (socket) => {
       if (existName && existScore >= EXIST_THRESHOLD) {
         console.log(`[DB] Face already exists as ${existName} (score=${existScore.toFixed(3)}), skip saving`);
 
-        // Gửi cho React biết là đăng ký thất bại vì trùng mặt
         io.emit("register_failed", {
           reason: "face_exists",
           existName,
@@ -121,7 +167,7 @@ aiNsp.on("connection", (socket) => {
         return;
       }
 
-      // ----- 3. Không trùng -> lưu user mới (hoặc update theo name) -----
+      // Không trùng -> lưu user mới (hoặc update theo name)
       const user = await LockUser.findOneAndUpdate({ name }, { name, embedding: newEmb }, { upsert: true, new: true });
 
       console.log("[DB] Saved LockUser:", user?.name);
@@ -134,9 +180,15 @@ aiNsp.on("connection", (socket) => {
   // 🔥 Nhận embedding để NHẬN DIỆN TỰ ĐỘNG
   socket.on("recognize_embedding", async (data: any) => {
     try {
-      const { embedding } = data;
+      const { embedding, chip_cam_id } = data;
 
-      // ====== KHÔNG CÓ EMBEDDING -> KHÔNG THẤY MẶT ======
+      // COOLDOWN 5s
+      const now = Date.now();
+      const diff = now - lastRecognizeAt;
+      if (diff < RECOGNIZE_COUNTDOWN) {
+        return;
+      }
+
       if (!embedding || !Array.isArray(embedding)) {
         io.emit("recognize_result", { name: "NoFace", score: 0 });
         return;
@@ -169,16 +221,37 @@ aiNsp.on("connection", (socket) => {
         bestName = "Unknown";
       }
 
-      // console.log("[AI] recognize:", bestName, bestScore.toFixed(3));
       io.emit("recognize_result", { name: bestName, score: bestScore });
 
-      // 🔥 NẾU NHẬN DIỆN ĐƯỢC NGƯỜI HỢP LỆ -> GỬI MQTT MỞ CỬA
+      // Nếu nhận diện OK -> mở cửa + bật cooldown
       if (bestName !== "Unknown" && bestName !== "NoFace") {
-        // Optional: log để debug
-        console.log("[MQTT] OPEN DOOR by FaceID user:", bestName);
+        console.log("[MQTT] OPEN DOOR by FaceID user:", bestName, "score=", bestScore.toFixed(3));
 
-        mqttClient.publish("iot/rfid/command", "OPEN");
-        // ESP32 sẽ nhận "OPEN" và tự mở khóa giống như RFID
+        // 🔹 Tìm LockUser theo tên
+        const lockUserDoc = await LockUser.findOne({ name: bestName }).lean();
+
+        if (lockUserDoc) {
+          const device = await Device.findOne({ chip_cam_id }).lean();
+
+          await AccessLog.create({
+            device_id: device._id,
+            lock_user_id: lockUserDoc._id,
+            method: "FACEID",
+            result: "SUCCESS",
+          });
+
+          console.log("[ACCESS_LOG] FACEID SUCCESS:", "user=", bestName, "device=", device._id.toString());
+        } else {
+          console.warn("[ACCESS_LOG] Không tìm thấy LockUser với name:", bestName);
+        }
+
+        if (mqttClient.connected) {
+          mqttClient.publish("iot/rfid/command", "OPEN");
+        } else {
+          console.warn("[MQTT] Client not connected, cannot OPEN door");
+        }
+
+        lastRecognizeAt = now;
       }
     } catch (err) {
       console.error("[AI] recognize_embedding error:", err);
@@ -195,20 +268,41 @@ const ESP_WS_PORT = 8081;
 
 const wss = new WebSocketServer({ port: ESP_WS_PORT });
 
+const camIdMap = new Map<WebSocket, string>();
+
 wss.on("connection", (ws: WebSocket) => {
   console.log("[ESP32] connected");
 
-  ws.on("message", (data: RawData, isBinary: boolean) => {
+  ws.on("message", async (data: RawData, isBinary: boolean) => {
+    if (!isBinary) {
+      // TEXT: có thể là cam_hello
+      try {
+        const text = data.toString();
+        const json = JSON.parse(text);
+        if (json.type === "cam_hello" && json.chip_cam_id) {
+          camIdMap.set(ws, json.chip_cam_id);
+          console.log("[ESP32] cam_hello from", json.chip_cam_id);
+        }
+      } catch {
+        console.log("[ESP32] text message:", data.toString());
+      }
+      return;
+    }
+
+    // BINARY: đây là frame JPEG
     const buffer = Buffer.isBuffer(data) ? data : Buffer.from(data as ArrayBuffer);
 
     const base64 = buffer.toString("base64");
     const dataUrl = `data:image/jpeg;base64,${base64}`;
 
+    const chipCamId = camIdMap.get(ws) || null;
+    const device = await Device.findOne({ chip_cam_id: chipCamId }).lean();
+
     // Gửi cho React hiển thị
-    io.emit("esp_frame", { image: dataUrl });
+    io.emit("esp_frame", { image: dataUrl, device: device });
 
     // Gửi cho Python AI (namespace /ai)
-    aiNsp.emit("frame", { image: base64 });
+    aiNsp.emit("frame", { image: base64, chip_cam_id: chipCamId });
   });
 
   ws.on("close", () => console.log("[ESP32] disconnected"));

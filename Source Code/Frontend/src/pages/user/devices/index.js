@@ -1,39 +1,39 @@
-"use client"
+"use client";
 
-import { memo, useEffect, useMemo, useState } from "react"
-import "./style.scss"
-import { FiPlus, FiTrash2 } from "react-icons/fi"
-import { api } from "services/api.service"
-import { socket } from "services/socket.service"
-import { useNavigate } from "react-router-dom"
+import { memo, useEffect, useMemo, useState } from "react";
+import "./style.scss";
+import { FiPlus, FiTrash2 } from "react-icons/fi";
+import { api } from "services/api.service";
+import { socket } from "services/socket.service";
+import { useNavigate } from "react-router-dom";
 
-const colorPalette = ["#3498db", "#27ae60", "#e74c3c", "#f39c12", "#9b59b6"]
+const colorPalette = ["#3498db", "#27ae60", "#e74c3c", "#f39c12", "#9b59b6"];
 
 const DevicesPage = () => {
-  const [devices, setDevices] = useState([])
-  const [creating, setCreating] = useState(false)
-  const [newDeviceName, setNewDeviceName] = useState("")
-  const [rfidScanInfo, setRfidScanInfo] = useState(null)
-  const [rfidRegisterInfo, setRfidRegisterInfo] = useState(null)
-  const [registeringDeviceId, setRegisteringDeviceId] = useState(null)
-  const [deviceRfids, setDeviceRfids] = useState({})
-  const [deletingDeviceId, setDeletingDeviceId] = useState(null)
-  const [openRfidDeviceId, setOpenRfidDeviceId] = useState(null)
+  const [devices, setDevices] = useState([]);
+  const [creating, setCreating] = useState(false);
+  const [newDeviceName, setNewDeviceName] = useState("");
+  const [rfidScanInfo, setRfidScanInfo] = useState(null);
+  const [rfidRegisterInfo, setRfidRegisterInfo] = useState(null);
+  const [registeringDeviceId, setRegisteringDeviceId] = useState(null);
+  const [deviceRfids, setDeviceRfids] = useState({});
+  const [deletingDeviceId, setDeletingDeviceId] = useState(null);
+  const [openRfidDeviceId, setOpenRfidDeviceId] = useState(null);
   const navigate = useNavigate();
 
   const stats = useMemo(() => {
-    const total = devices.length
+    const total = devices.length;
     // Tạm thời coi tất cả là Online cho đơn giản (1 device)
     return [
       { number: total, label: "Total Devices", color: "#3498db" },
       { number: total, label: "Online Devices", color: "#27ae60" },
-    ]
-  }, [devices])
+    ];
+  }, [devices]);
 
   const fetchDevices = async () => {
     try {
-      const res = await api.get("/device")
-      const list = res.data?.result || []
+      const res = await api.get("/device");
+      const list = res.data?.result || [];
       const enhanced = list.map((d, idx) => ({
         ...d,
         id: d._id,
@@ -45,100 +45,100 @@ const DevicesPage = () => {
         uptime: "N/A",
         location: d.name || `Device ${idx + 1}`,
         color: colorPalette[idx % colorPalette.length],
-      }))
-      setDevices(enhanced)
+      }));
+      setDevices(enhanced);
     } catch (error) {
-      console.error("Fetch devices error", error)
+      console.error("Fetch devices error", error);
     }
-  }
+  };
 
   const handleCreateDevice = async () => {
     if (!newDeviceName.trim()) {
-      alert("Vui lòng nhập tên thiết bị")
-      return
+      alert("Vui lòng nhập tên thiết bị");
+      return;
     }
-    setCreating(true)
+    setCreating(true);
     try {
-      await api.post("/device", { name: newDeviceName.trim() })
-      await fetchDevices()
-      setNewDeviceName("")
+      await api.post("/device", { name: newDeviceName.trim() });
+      await fetchDevices();
+      setNewDeviceName("");
     } catch (error) {
-      console.error("Create device error", error)
-      alert("Tạo thiết bị thất bại")
+      console.error("Create device error", error);
+      alert("Tạo thiết bị thất bại");
     } finally {
-      setCreating(false)
+      setCreating(false);
     }
-  }
+  };
 
   const handleDeleteDevice = async (deviceId) => {
-    if (!window.confirm("Bạn có chắc muốn xóa thiết bị này?")) return
-    setDeletingDeviceId(deviceId)
+    if (!window.confirm("Bạn có chắc muốn xóa thiết bị này?")) return;
+    setDeletingDeviceId(deviceId);
     try {
-      await api.delete(`/device/${deviceId}`)
-      await fetchDevices()
+      await api.delete(`/device/${deviceId}`);
+      await fetchDevices();
     } catch (error) {
-      console.error("Delete device error", error)
-      alert("Xóa thiết bị thất bại")
+      console.error("Delete device error", error);
+      alert("Xóa thiết bị thất bại");
     } finally {
-      setDeletingDeviceId(null)
+      setDeletingDeviceId(null);
     }
-  }
+  };
 
   const handleRegisterRfidForDevice = async (deviceId) => {
     try {
-      const name = window.prompt("Nhập tên/nhãn cho thẻ RFID (ví dụ: Thẻ nhà, Thẻ Bố...):", "")
-      await api.post(`/rf_id/register_mode/${deviceId}`, { name: name || undefined })
-      setRegisteringDeviceId(deviceId)
+      const name = window.prompt("Nhập tên/nhãn cho thẻ RFID (ví dụ: Thẻ nhà, Thẻ Bố...):", "");
+      await api.post(`/rf_id/register_mode/${deviceId}`, { name: name || undefined });
+      setRegisteringDeviceId(deviceId);
       setRfidRegisterInfo({
         status: "WAITING",
         message: "Đang chờ bạn quét thẻ trên thiết bị...",
         device_id: deviceId,
-      })
+      });
     } catch (error) {
-      console.error(error)
-      alert("Bật chế độ đăng ký thẻ thất bại")
+      console.error(error);
+      alert("Bật chế độ đăng ký thẻ thất bại");
     }
-  }
+  };
 
   const handleViewRfids = async (deviceId) => {
     // toggle hiển thị: nếu đang mở thì đóng lại
     if (openRfidDeviceId === deviceId) {
-      setOpenRfidDeviceId(null)
-      return
+      setOpenRfidDeviceId(null);
+      return;
     }
 
     try {
-      const res = await api.get(`/rf_id/device/${deviceId}`)
-      const list = res.data?.result || []
-      setDeviceRfids((prev) => ({ ...prev, [deviceId]: list }))
-      setOpenRfidDeviceId(deviceId)
+      const res = await api.get(`/rf_id/device/${deviceId}`);
+      const list = res.data?.result || [];
+      setDeviceRfids((prev) => ({ ...prev, [deviceId]: list }));
+      setOpenRfidDeviceId(deviceId);
     } catch (error) {
-      console.error("Fetch rfids error", error)
-      alert("Lấy danh sách thẻ thất bại")
+      console.error("Fetch rfids error", error);
+      alert("Lấy danh sách thẻ thất bại");
     }
-  }
+  };
 
   const handleDeleteRfidFromDevice = async (deviceId, rfidId) => {
-    if (!window.confirm("Bạn có chắc muốn xóa thẻ này khỏi thiết bị?")) return
+    if (!window.confirm("Bạn có chắc muốn xóa thẻ này khỏi thiết bị?")) return;
     try {
-      await api.delete(`/rf_id/device/${deviceId}/${rfidId}`)
+      await api.delete(`/rf_id/device/${deviceId}/${rfidId}`);
       setDeviceRfids((prev) => ({
         ...prev,
         [deviceId]: (prev[deviceId] || []).filter((r) => r._id !== rfidId),
-      }))
+      }));
     } catch (error) {
-      console.error("Delete rfid error", error)
-      alert("Xóa thẻ thất bại")
+      console.error("Delete rfid error", error);
+      alert("Xóa thẻ thất bại");
     }
-  }
+  };
 
   const handleViewDevice = (deviceId) => {
-    navigate('/devices/' + deviceId);
-  }
+    navigate("/devices/" + deviceId);
+  };
 
   useEffect(() => {
-    fetchDevices()
-  }, [])
+    fetchDevices();
+  }, []);
 
   useEffect(() => {
     const onScan = (data) => {
@@ -146,47 +146,41 @@ const DevicesPage = () => {
         uid: data.uid,
         mode: data.mode,
         device_id: data.device_id,
-      })
-    }
+      });
+    };
 
     const onRegistered = (data) => {
-      setRegisteringDeviceId(null)
+      setRegisteringDeviceId(null);
       setRfidRegisterInfo({
         uid: data.uid,
         device_id: data.device_id,
         status: data.status,
-        message:
-          data.status === "CREATED"
-            ? "Đăng ký thẻ mới thành công!"
-            : "Thẻ đã tồn tại trong hệ thống.",
+        message: data.status === "CREATED" ? "Đăng ký thẻ mới thành công!" : "Thẻ đã tồn tại trong hệ thống.",
         name: data.name,
-      })
+      });
 
       // Cập nhật realtime danh sách thẻ cho thiết bị nếu đã được load
       if (data.device_id && data.status === "CREATED") {
         setDeviceRfids((prev) => {
-          const current = prev[data.device_id] || []
-          const exists = current.some((r) => r.rf_id === data.uid)
-          if (exists) return prev
+          const current = prev[data.device_id] || [];
+          const exists = current.some((r) => r.rf_id === data.uid);
+          if (exists) return prev;
           return {
             ...prev,
-            [data.device_id]: [
-              ...current,
-              { rf_id: data.uid, name: data.name || undefined, _id: data.uid },
-            ],
-          }
-        })
+            [data.device_id]: [...current, { rf_id: data.uid, name: data.name || undefined, _id: data.uid }],
+          };
+        });
       }
-    }
+    };
 
-    socket.on("client-rfid-scan", onScan)
-    socket.on("client-rfid-registered", onRegistered)
+    socket.on("client-rfid-scan", onScan);
+    socket.on("client-rfid-registered", onRegistered);
 
     return () => {
-      socket.off("client-rfid-scan", onScan)
-      socket.off("client-rfid-registered", onRegistered)
-    }
-  }, [])
+      socket.off("client-rfid-scan", onScan);
+      socket.off("client-rfid-registered", onRegistered);
+    };
+  }, []);
 
   return (
     <div className="devices-page">
@@ -250,6 +244,7 @@ const DevicesPage = () => {
             <tr>
               <th>Device</th>
               <th>IP Address</th>
+              <th>Camera</th>
               <th>Status</th>
               <th>Location</th>
               <th>Uptime</th>
@@ -277,6 +272,9 @@ const DevicesPage = () => {
                     <p>{device.ip}</p>
                     <p className="port">Port {device.port}</p>
                   </div>
+                </td>
+                <td>
+                  {device.chip_cam_id ? (<p>{device.chip_cam_id}</p>): ("Chưa có camera")}
                 </td>
                 <td>
                   <div className={`status-badge ${device.status.toLowerCase()}`}>
@@ -335,7 +333,7 @@ const DevicesPage = () => {
         </table>
       </div>
     </div>
-  )
-}
+  );
+};
 
-export default memo(DevicesPage)
+export default memo(DevicesPage);

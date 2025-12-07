@@ -197,6 +197,43 @@
             }
           }
         }
+        .assign-row {
+          display: flex;
+          gap: 8px;
+          align-items: center;
+          margin-top: 6px;
+        }
+
+        .assign-select {
+          flex: 1;
+          padding: 6px 10px;
+          border-radius: 8px;
+          border: 1px solid #ddd;
+          background: #0b1020;
+          color: #fff;
+          outline: none;
+
+          &:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+          }
+        }
+
+        .assign-button {
+          padding: 6px 12px;
+          border-radius: 8px;
+          border: none;
+          background: #4f46e5;
+          color: #fff;
+          font-size: 0.9rem;
+          cursor: pointer;
+          white-space: nowrap;
+
+          &:disabled {
+            background: #555;
+            cursor: not-allowed;
+          }
+        }
       }
     }
 

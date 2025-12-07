@@ -44,8 +44,7 @@ client.on("message", async (topic: string, message: Buffer) => {
       if (chipId && door) {
         const device = await Device.findOne({ chip_id: chipId });
         if (device) {
-          const newStatus: "OPEN" | "CLOSE" =
-            door.toUpperCase() === "OPEN" ? "OPEN" : "CLOSE";
+          const newStatus: "OPEN" | "CLOSE" = door.toUpperCase() === "OPEN" ? "OPEN" : "CLOSE";
           if (device.status !== newStatus) {
             device.status = newStatus;
             await device.save();

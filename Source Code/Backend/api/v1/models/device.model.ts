@@ -4,6 +4,7 @@ const deviceSchema = new Schema(
   {
     name: { type: String },
     chip_id: { type: String, unique: true, sparse: true },
+    chip_cam_id: {type: String, unique: true},
     mode: { type: String, enum: ["AND", "OR"], default: "OR" },
     status: {type: String, enum: ["OPEN", "CLOSE"], default: "OPEN"},
   },
