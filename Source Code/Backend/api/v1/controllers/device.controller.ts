@@ -1,13 +1,15 @@
 import { Request, Response } from "express";
 import Device from "../models/device.model";
 import mqttClient from "../../../mqtt/mqttconnect";
+import AccessLog from "../models/access_log.model";
+import { io } from "../../../socket.io/socket";
 
 // Get /device
 export const getListDevice = async (req: Request, res: Response) => {
   try {
     const devices = await Device.find();
 
-    return res.status(201).json({ code: 201, message: "Lấy thiết bị thành công", result: devices  });
+    return res.status(201).json({ code: 201, message: "Lấy thiết bị thành công", result: devices });
   } catch (error: any) {
     return res.status(500).json({ code: 500, message: "Lỗi máy chủ", error: error.message });
   }
@@ -19,7 +21,7 @@ export const getDevice = async (req: Request, res: Response) => {
     const device_id = req.params.device_id;
     const device = await Device.findById(device_id);
 
-    return res.status(201).json({ code: 201, message: "Lấy thiết bị thành công", result: device  });
+    return res.status(201).json({ code: 201, message: "Lấy thiết bị thành công", result: device });
   } catch (error: any) {
     return res.status(500).json({ code: 500, message: "Lỗi máy chủ", error: error.message });
   }
@@ -101,9 +103,34 @@ export const switchDoorDevice = async (req: Request, res: Response) => {
     const cmd = status === "OPEN" ? "OPEN" : "CLOSE";
     mqttClient.publish("iot/rfid/command", cmd);
 
-    res
-      .status(200)
-      .json({ code: 200, message: "Chuyển đổi trạng thái cửa thành công", result: device });
+    const log = await AccessLog.create({
+      device_id: device._id,
+      method: "APP",
+      result: "SUCCESS",
+    });
+
+    // Payload gửi realtime cho FE (AlertsPage đang dùng)
+    const logPayload = {
+      _id: log._id,
+      device_id: device._id.toString(),
+      device_name: device.name,
+      rf_id: null,
+      method: "APP",
+      result: "SUCCESS",
+      createdAt: log.createdAt,
+    };
+
+    // Emit để AlertsPage + HistoryPage nhận được log mới
+    io.emit("client-access-log", logPayload);
+
+    // Tuỳ bạn có muốn emit thêm trạng thái cửa luôn không
+    io.emit("client-door-status", {
+      chip_id: device.chip_id || null,
+      device_id: device._id.toString(),
+      door: cmd,
+    });
+
+    res.status(200).json({ code: 200, message: "Chuyển đổi trạng thái cửa thành công", result: device });
   } catch (error: any) {
     return res.status(500).json({ code: 500, message: "Lỗi máy chủ", error: error.message });
   }

@@ -8,6 +8,7 @@ import DeviceUser from "../api/v1/models/device_user.model";
 import AccessLog from "../api/v1/models/access_log.model";
 import { getRfidState, clearRegisterMode } from "./rfidState";
 import { io } from "../socket.io/socket";
+import { onRFIDSuccess } from "./authModeState";
 
 // const MQTT_URL = "mqtt://192.168.24.126:1883";
 const MQTT_URL = "mqtt://192.168.24.103:1883";
@@ -164,9 +165,6 @@ client.on("message", async (topic: string, message: Buffer) => {
             result: "SUCCESS",
           });
 
-          // Gửi lệnh mở cửa cho ESP32 qua MQTT
-          client.publish("iot/rfid/command", "OPEN");
-
           const logPayload = {
             _id: log._id,
             device_id: deviceFromChip._id.toString(),
@@ -184,6 +182,20 @@ client.on("message", async (topic: string, message: Buffer) => {
             device_id: deviceFromChip._id.toString(),
             status: "ALLOWED",
           });
+
+          // 👉 KIỂM TRA auth_mode
+          const authMode = (deviceFromChip as any).auth_mode || "OR";
+
+          if (authMode === "OR") {
+            // như cũ
+            client.publish("iot/rfid/command", "OPEN");
+          } else {
+            // AND mode: đánh dấu RFID OK, xem có đủ FACEID chưa
+            const shouldOpen = onRFIDSuccess(deviceFromChip._id.toString());
+            if (shouldOpen) {
+              client.publish("iot/rfid/command", "OPEN");
+            }
+          }
         } else {
           console.log("[MQTT] Thẻ không được gán cho device này, từ chối mở khóa");
           const log = await AccessLog.create({

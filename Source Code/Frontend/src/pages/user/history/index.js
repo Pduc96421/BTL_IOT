@@ -35,9 +35,9 @@ const HistoryPage = () => {
         const rawMethod = (item.method || "RFID").toLowerCase();
         let methodLabel = "RFID";
 
-        if (rawMethod === "face id" || rawMethod === "faceid" || rawMethod === "face") {
-          methodLabel = "Face ID";
-        } else if (rawMethod === "app") {
+        if (rawMethod === "FACEID") {
+          methodLabel = "FACEID";
+        } else if (rawMethod === "APP") {
           methodLabel = "App";
         } else {
           methodLabel = "RFID";
@@ -78,8 +78,8 @@ const HistoryPage = () => {
 
   const methodLabel = useMemo(() => {
     switch (selectedMethod) {
-      case "face id":
-        return "Face ID";
+      case "FACEID":
+        return "FACEID";
       case "rfid":
         return "RFID";
       case "app":
@@ -102,7 +102,7 @@ const HistoryPage = () => {
 
   const getMethodIcon = (method) => {
     switch (method) {
-      case "Face ID":
+      case "FACEID":
         return "👤";
       case "RFID":
         return "📳";
@@ -153,7 +153,7 @@ const HistoryPage = () => {
             </button>
             <div className="dropdown-menu">
               <div onClick={() => setSelectedMethod("all")}>All Methods</div>
-              <div onClick={() => setSelectedMethod("face id")}>Face ID</div>
+              <div onClick={() => setSelectedMethod("FACEID")}>Face ID</div>
               <div onClick={() => setSelectedMethod("rfid")}>RFID</div>
               <div onClick={() => setSelectedMethod("app")}>App</div>
             </div>

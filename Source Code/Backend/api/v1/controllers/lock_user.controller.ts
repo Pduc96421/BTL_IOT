@@ -35,6 +35,8 @@ export const createLockUser = async (req: Request, res: Response) => {
       return res.status(400).json({ code: 400, message: "Thiếu thông tin tên khóa người dùng" });
     }
 
+    const lockUser = await LockUser.create({ name });
+
     return res.status(201).json({ code: 201, message: "Thêm lock User thanh công" });
   } catch (error: any) {
     return res.status(500).json({ code: 500, message: "Lỗi máy chủ", error: error.message });
