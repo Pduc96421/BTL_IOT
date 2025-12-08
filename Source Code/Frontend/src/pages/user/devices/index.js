@@ -273,9 +273,7 @@ const DevicesPage = () => {
                     <p className="port">Port {device.port}</p>
                   </div>
                 </td>
-                <td>
-                  {device.chip_cam_id ? (<p>{device.chip_cam_id}</p>): ("Chưa có camera")}
-                </td>
+                <td>{device.chip_cam_id ? <p>{device.chip_cam_id}</p> : "Chưa có camera"}</td>
                 <td>
                   <div className={`status-badge ${device.status.toLowerCase()}`}>
                     <span className={`status-dot ${device.status.toLowerCase()}`}></span>

@@ -22,6 +22,9 @@ const DashboardPage = () => {
   const [lastAccess, setLastAccess] = useState(null);
   const [accessStats, setAccessStats] = useState({ total: 0, success: 0, rate: "0%" });
 
+  // ==== chế độ xác thực (AND / OR) ====
+  const [mode, setMode] = useState("OR"); // "AND" | "OR"
+
   // ==== lock user + chọn user để gán vào device ====
   const [lockUsers, setLockUsers] = useState([]);
   const [selectedLockUserId, setSelectedLockUserId] = useState("");
@@ -54,7 +57,7 @@ const DashboardPage = () => {
       setDoorStatus(normalized);
     });
 
-    // Khi mở bằng RFID
+    // Khi mở bằng RFID (ALLOW) thì chắc chắn cửa đã open
     socket.on("client-rfid-access", (data) => {
       if (data?.status === "ALLOWED") {
         setDoorStatus("open");
@@ -92,6 +95,7 @@ const DashboardPage = () => {
         if (selectedDevice) {
           setCurrentDevice(selectedDevice);
           setDoorStatus(selectedDevice.status === "OPEN" ? "open" : "closed");
+          setMode(selectedDevice.mode || "OR");
         }
 
         // 2) Lịch sử truy cập
@@ -108,14 +112,16 @@ const DashboardPage = () => {
           setAccessStats({ total, success, rate });
         }
 
-        // 3) Lấy danh sách LockUser để gán vào device
-        const lockRes = await api.get(`/device_user/${device_id}/lock_users/unassigned`);
-        const lockList = lockRes.data?.result || [];
-        setLockUsers(lockList);
+        // 3) Lấy danh sách LockUser để gán vào device (nếu đã chọn được device)
+        if (selectedDevice) {
+          const lockRes = await api.get(`/device_user/${selectedDevice._id}/lock_users/unassigned`);
+          const lockList = lockRes.data?.result || [];
+          setLockUsers(lockList);
 
-        // mặc định chọn user đầu tiên nếu có
-        if (lockList.length > 0) {
-          setSelectedLockUserId(lockList[0]._id);
+          // mặc định chọn user đầu tiên nếu có
+          if (lockList.length > 0) {
+            setSelectedLockUserId(lockList[0]._id);
+          }
         }
       } catch (err) {
         console.error("Dashboard init error", err);
@@ -146,6 +152,24 @@ const DashboardPage = () => {
     }
   };
 
+  // 🔄 Toggle chế độ AND / OR
+  const handleToggleMode = async () => {
+    if (!currentDevice) {
+      alert("Chưa có thiết bị");
+      return;
+    }
+
+    try {
+      await api.post(`/device/${currentDevice._id}/switch_mode`);
+
+      // Backend chỉ trả message, nên FE tự flip state
+      setMode((prev) => (prev === "AND" ? "OR" : "AND"));
+    } catch (err) {
+      console.error("switch_mode error", err);
+      alert("Chuyển đổi chế độ thất bại");
+    }
+  };
+
   // 🚪 Gán lock user vào device
   const handleAssignLockUser = async () => {
     if (!currentDevice) {
@@ -164,6 +188,16 @@ const DashboardPage = () => {
 
       alert("Đăng ký người dùng vào thiết bị thành công");
       console.log("register_to_device result:", res.data?.result);
+
+      // Sau khi gán xong, refetch list lockUsers chưa gán
+      const lockRes = await api.get(`/device_user/${currentDevice._id}/lock_users/unassigned`);
+      const lockList = lockRes.data?.result || [];
+      setLockUsers(lockList);
+      if (lockList.length > 0) {
+        setSelectedLockUserId(lockList[0]._id);
+      } else {
+        setSelectedLockUserId("");
+      }
     } catch (err) {
       console.error("register_to_device error", err);
       alert("Đăng ký người dùng vào thiết bị thất bại");
@@ -225,8 +259,23 @@ const DashboardPage = () => {
             </div>
           </div>
 
+          {/* Auth Mode Switch */}
+          <div className="controls-section">
+            <h3>Authentication Mode</h3>
+            <p className="controls-subtitle">
+              Chế độ hiện tại: <b>{mode === "OR" ? "OR – RFID hoặc FaceID" : "AND – cần RFID + FaceID"}</b>
+            </p>
+            <button className="assign-button" onClick={handleToggleMode} disabled={!currentDevice}>
+              Chuyển sang {mode === "OR" ? "AND (RFID + FaceID)" : "OR (1 trong 2)"}
+            </button>
+          </div>
+
           {/* 🔗 Gán Lock User vào Device */}
           <div className="controls-section">
+            <h3>Assign Lock User to Device</h3>
+            <p className="controls-subtitle">
+              Thiết bị hiện tại: <b>{currentDevice ? currentDevice.name : "Chưa chọn"}</b>
+            </p>
             <div className="assign-row">
               <select
                 className="assign-select"

@@ -9,6 +9,7 @@ import LockUser from "../api/v1/models/lock_user.model";
 import Device from "../api/v1/models/device.model"; // 👈 để lưu chip_cam_id
 import DeviceUser from "../api/v1/models/device_user.model";
 import AccessLog from "../api/v1/models/access_log.model";
+import { onFaceSuccess } from "../mqtt/authModeState";
 
 const app = express();
 const server = http.createServer(app);
@@ -58,11 +59,6 @@ mqttClient.on("message", async (topic, message) => {
     console.log("[MQTT] CAM ONLINE, chip_cam_id =", chip_cam_id);
 
     // ====== BIND chip_cam_id VÀO DEVICE ======
-    // Ưu tiên:
-    // 1. Nếu đã có device nào có chip_cam_id này -> dùng luôn
-    // 2. Nếu không, tìm 1 device chưa có chip_cam_id để gán
-    // 3. Nếu vẫn không có -> tạo mới device
-
     let device = await Device.findOne({ chip_cam_id });
 
     if (!device) {
@@ -196,11 +192,31 @@ aiNsp.on("connection", (socket) => {
 
       const emb = embedding as number[];
 
-      const users = await LockUser.find().lean();
-      if (!users.length) {
+      // ====== 1. TÌM DEVICE THEO chip_cam_id ======
+      const device = await Device.findOne({ chip_cam_id }).lean();
+      if (!device) {
+        console.warn("[FACEID] Không tìm thấy device với chip_cam_id =", chip_cam_id);
         io.emit("recognize_result", { name: "Unknown", score: 0 });
         return;
       }
+
+      // ====== 2. LẤY DANH SÁCH lock_user_id ĐÃ GÁN CHO DEVICE NÀY ======
+      const assignedLockUserIds: any[] = await DeviceUser.find({
+        device_id: device._id,
+        lock_user_id: { $ne: null },
+      }).distinct("lock_user_id"); // mảng ObjectId
+
+      if (!assignedLockUserIds.length) {
+        console.log("[FACEID] Device", device._id.toString(), "chưa có LockUser nào gán");
+        io.emit("recognize_result", { name: "Unknown", score: 0 });
+        return;
+      }
+
+      // ====== 3. LẤY CÁC LOCKUSER ĐÓ (CÓ EMBEDDING) ======
+      const users = await LockUser.find({
+        _id: { $in: assignedLockUserIds as any[] },
+        embedding: { $exists: true, $ne: [] },
+      }).lean();
 
       let bestName = "Unknown";
       let bestScore = -1;
@@ -225,30 +241,41 @@ aiNsp.on("connection", (socket) => {
 
       // Nếu nhận diện OK -> mở cửa + bật cooldown
       if (bestName !== "Unknown" && bestName !== "NoFace") {
-        console.log("[MQTT] OPEN DOOR by FaceID user:", bestName, "score=", bestScore.toFixed(3));
+        // console.log("[MQTT] OPEN DOOR by FaceID user:", bestName, "score=", bestScore.toFixed(3), device._id.toString());
 
         // 🔹 Tìm LockUser theo tên
         const lockUserDoc = await LockUser.findOne({ name: bestName }).lean();
 
         if (lockUserDoc) {
-          const device = await Device.findOne({ chip_cam_id }).lean();
-
           await AccessLog.create({
             device_id: device._id,
             lock_user_id: lockUserDoc._id,
             method: "FACEID",
             result: "SUCCESS",
           });
-
-          console.log("[ACCESS_LOG] FACEID SUCCESS:", "user=", bestName, "device=", device._id.toString());
         } else {
           console.warn("[ACCESS_LOG] Không tìm thấy LockUser với name:", bestName);
         }
 
-        if (mqttClient.connected) {
-          mqttClient.publish("iot/rfid/command", "OPEN");
+        const authMode = (device as any).mode || "OR";
+
+        if (authMode === "OR") {
+          // như cũ: chỉ cần Face đúng là mở
+          if (mqttClient.connected) {
+            mqttClient.publish("iot/rfid/command", "OPEN");
+          } else {
+            console.warn("[MQTT] Client not connected, cannot OPEN door");
+          }
         } else {
-          console.warn("[MQTT] Client not connected, cannot OPEN door");
+          // AND: đánh dấu FaceID OK, check xem đã có RFID OK chưa
+          const shouldOpen = onFaceSuccess(device._id.toString());
+          if (shouldOpen) {
+            if (mqttClient.connected) {
+              mqttClient.publish("iot/rfid/command", "OPEN");
+            } else {
+              console.warn("[MQTT] Client not connected, cannot OPEN door");
+            }
+          }
         }
 
         lastRecognizeAt = now;

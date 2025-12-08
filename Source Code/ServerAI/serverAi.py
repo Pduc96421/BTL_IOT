@@ -52,7 +52,7 @@ print("[AI] MTCNN & InceptionResnetV1 initialized")
 REGISTERING = False
 REGISTER_NAME = ""
 REGISTER_EMBS: list[np.ndarray] = []
-MAX_REGISTER_FRAMES = 5  # thu ít cho nhanh test, sau muốn thì tăng
+MAX_REGISTER_FRAMES = 20  # thu ít cho nhanh test, sau muốn thì tăng
 
 # ==============================
 # 3. Hàm convert base64 -> embedding
@@ -205,7 +205,7 @@ def on_frame(data):
     # --- MODE NHẬN DIỆN TỰ ĐỘNG ---
     sio.emit(
         "recognize_embedding",
-        {"embedding": emb.tolist(), chip_cam_id: chip_cam_id},
+        {"embedding": emb.tolist(), "chip_cam_id": chip_cam_id},
         namespace="/ai",
     )
 
