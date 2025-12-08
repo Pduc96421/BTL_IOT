@@ -12,6 +12,8 @@ const AlertsPage = () => {
   const [logs, setLogs] = useState([]);
   // Thời điểm gần nhất mà cửa đã được mở (bằng bất kỳ cách nào)
   const [lastResetAt, setLastResetAt] = useState(null);
+  // Đã gửi email cho đợt cảnh báo hiện tại chưa
+  const [alertSent, setAlertSent] = useState(false);
 
   // ===== 1. Lấy log ban đầu từ backend =====
   const fetchAlerts = async () => {
@@ -28,7 +30,7 @@ const AlertsPage = () => {
     fetchAlerts();
   }, []);
 
-  // ===== 2. Lắng nghe realtime access log (RFID) =====
+  // ===== 2. Lắng nghe realtime access log (RFID, FACEID, ...) =====
   useEffect(() => {
     const onAccessLog = (log) => {
       // Đưa log mới lên đầu, giữ tối đa 200 cái
@@ -50,8 +52,9 @@ const AlertsPage = () => {
       const door = String(data.door).toUpperCase(); // "OPEN" | "CLOSED"
       if (door === "OPEN") {
         // Cửa đã mở thành công (RFID / FaceID / App / v.v.)
-        // -> reset cảnh báo: đánh dấu mốc thời gian
+        // -> reset cảnh báo: đánh dấu mốc thời gian + cho phép gửi mail lần sau
         setLastResetAt(Date.now());
+        setAlertSent(false);
       }
     };
 
@@ -85,21 +88,52 @@ const AlertsPage = () => {
       return { consecutiveFails: 0, hasCritical: false, failedLogs: [] };
     }
 
-    // Đếm số lần FAIL liên tiếp từ MỚI NHẤT trở xuống
+    // 🔹 CHỈ XÉT RFID
+    const rfidLogs = workingLogs.filter((l) => l.method === "RFID");
+
+    if (!rfidLogs.length) {
+      return { consecutiveFails: 0, hasCritical: false, failedLogs: [] };
+    }
+
+    // Đếm số lần RFID FAIL liên tiếp từ MỚI NHẤT trở xuống
     let count = 0;
-    for (const log of workingLogs) {
+    for (const log of rfidLogs) {
       if (log.result === "FALSE") count += 1;
       else break;
     }
 
-    const onlyFailed = workingLogs.filter((l) => l.result === "FALSE");
+    const onlyFailed = rfidLogs.filter((l) => l.result === "FALSE");
 
     return {
       consecutiveFails: count,
-      hasCritical: count >= 5,
+      hasCritical: count >= 5, // >= 5 lần RFID sai liên tiếp
       failedLogs: onlyFailed,
     };
   }, [logs, lastResetAt]);
+
+  // ===== 5. Khi hasCritical = true thì gọi API gửi email (mỗi đợt chỉ gửi 1 lần) =====
+  useEffect(() => {
+    const sendAlertEmail = async () => {
+      if (!hasCritical || alertSent || !failedLogs.length) return;
+
+      const latestFailed = failedLogs[0]; // log RFID FAIL mới nhất (vì logs đang sort mới -> cũ)
+
+      try {
+        await api.post("/auth/alert", {
+          rfid: latestFailed.rf_id || null,
+          deviceName: latestFailed.device_name || latestFailed.device_id?.name || "Unknown",
+          time: latestFailed.createdAt,
+        });
+
+        console.log("Alert email sent");
+        setAlertSent(true); // đánh dấu đã gửi
+      } catch (err) {
+        console.error("Send alert email error", err);
+      }
+    };
+
+    sendAlertEmail();
+  }, [hasCritical, alertSent, failedLogs]);
 
   return (
     <div className="alerts-page">
@@ -112,16 +146,16 @@ const AlertsPage = () => {
         <div className="alert-banner critical">
           <h2>Cảnh báo an toàn mức cao</h2>
           <p>
-            Phát hiện <strong>{consecutiveFails}</strong> lần quẹt thẻ thất bại liên tiếp gần nhất. Vui lòng kiểm tra
-            thiết bị và môi trường xung quanh ngay lập tức.
+            Phát hiện <strong>{consecutiveFails}</strong> lần quẹt thẻ RFID thất bại liên tiếp gần nhất. Vui lòng kiểm
+            tra thiết bị và môi trường xung quanh ngay lập tức.
           </p>
         </div>
       ) : (
         <div className="alert-banner normal">
           <h2>Không có cảnh báo nghiêm trọng</h2>
           <p>
-            Hệ thống không ghi nhận 5 lần quẹt thẻ thất bại liên tiếp sau lần mở cửa gần nhất. Bạn vẫn nên theo dõi các
-            log truy cập bên dưới.
+            Hệ thống không ghi nhận 5 lần quẹt thẻ RFID thất bại liên tiếp sau lần mở cửa gần nhất. Bạn vẫn nên theo dõi
+            các log truy cập bên dưới.
           </p>
         </div>
       )}
@@ -153,7 +187,7 @@ const AlertsPage = () => {
             {!failedLogs.length && (
               <tr>
                 <td colSpan={5} style={{ textAlign: "center", padding: "16px" }}>
-                  Chưa có lần quẹt thẻ thất bại nào sau lần mở cửa gần nhất.
+                  Chưa có lần quẹt thẻ RFID thất bại nào sau lần mở cửa gần nhất.
                 </td>
               </tr>
             )}

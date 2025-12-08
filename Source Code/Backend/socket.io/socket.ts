@@ -1,3 +1,6 @@
+// cd "C:\\Program Files\\mosquitto"
+// mosquitto.exe -c mosquitto.conf -v
+
 // src/socket.io/socket.ts
 import http from "http";
 import express from "express";

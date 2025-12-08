@@ -62,9 +62,10 @@ const UsersPage = () => {
     }
     setCreating(true);
     try {
-      const res = await api.post("/lock_user", { name: newUserName.trim() });
+      await api.post("/lock_user", { name: newUserName.trim() });
       // API createLockUser hiện chưa trả result, nên refetch danh sách
       await fetchLockUsers();
+      alert("Tạo người dùng thành công");
       setNewUserName("");
     } catch (error) {
       console.error("Create lock user error", error);

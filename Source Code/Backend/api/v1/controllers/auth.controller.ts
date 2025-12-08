@@ -2,6 +2,7 @@ import { Request, Response } from "express";
 import User from "../models/user.model";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
+import { sendEmail } from "../../../helpers/sendMail";
 
 const JWT_SECRET = process.env.JWT_SECRET;
 
@@ -27,7 +28,6 @@ export const login = async (req: Request, res: Response) => {
   }
 };
 
-
 // Post api/v1/auth/register
 export const register = async (req: Request, res: Response) => {
   try {
@@ -52,5 +52,36 @@ export const register = async (req: Request, res: Response) => {
     return res.status(201).json({ code: 201, message: "Đăng ký tài khoản thành công", result: user });
   } catch (error: any) {
     return res.status(500).json({ code: 500, message: "Lỗi máy chủ", error: error.message });
+  }
+};
+
+// Post /api/v1/auth/alert
+export const alert = async (req: Request, res: Response) => {
+  try {
+    const { rfid, deviceName, time } = req.body;
+
+    // Email nhận cảnh báo (có thể sau này cho config trong DB)
+    const email = "pduc96421@gmail.com";
+
+    const subject = "Cảnh báo an ninh: Quẹt thẻ RFID thất bại nhiều lần";
+
+    const formattedTime = time ? new Date(time).toLocaleString("vi-VN") : "Không rõ";
+
+    const htmlSendMail = `
+      <p>Hệ thống ghi nhận nhiều lần quẹt thẻ RFID <b>thất bại</b> liên tiếp.</p>
+      <p>Thông tin chi tiết:</p>
+      <ul>
+        <li>RFID: <b>${rfid || "Không rõ"}</b></li>
+        <li>Thiết bị: <b>${deviceName || "Không rõ"}</b></li>
+        <li>Thời điểm ghi nhận gần nhất: <b>${formattedTime}</b></li>
+      </ul>
+      <p>Vui lòng kiểm tra khu vực xung quanh thiết bị ngay lập tức.</p>
+    `;
+
+    await sendEmail(email, subject, htmlSendMail);
+
+    res.status(200).json({ code: 200, message: "Alert email sent successfully" });
+  } catch (error: any) {
+    res.status(500).send({ code: 500, error: error.message });
   }
 };
