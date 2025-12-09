@@ -8,7 +8,8 @@ const char* ssid = "Duc";
 const char* password = "vuthikhanhlinh";
 
 // ================== MQTT ==================
-const char* mqtt_server = "192.168.24.103";
+// const char* mqtt_server = "192.168.24.103";
+const char* mqtt_server = "172.20.10.8";
 const int mqtt_port = 1883;
 
 WiFiClient espClient;
@@ -17,7 +18,8 @@ PubSubClient mqttClient(espClient);
 const char* CAM_ONLINE_TOPIC = "iot/cam/online";
 
 // ================== WEBSOCKET (NODE) ==================
-const char* server_ip = "192.168.24.103";  // IP máy chạy Node
+// const char* server_ip = "192.168.24.103";  // IP máy chạy Node
+const char* server_ip = "172.20.10.8";  // IP máy chạy Node
 const int server_port = 8081;              // port WebSocket bên Node
 
 WebSocketsClient webSocket;

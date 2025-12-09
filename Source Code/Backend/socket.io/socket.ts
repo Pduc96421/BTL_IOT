@@ -21,7 +21,8 @@ const server = http.createServer(app);
 const io = new Server(server, { cors: { origin: "*" } });
 
 // ============ MQTT KẾT NỐI TỚI BROKER ============
-const MQTT_URL = "mqtt://192.168.24.103:1883";
+// const MQTT_URL = "mqtt://192.168.24.103:1883";
+const MQTT_URL = "mqtt://172.20.10.8:1883";
 const mqttClient = mqtt.connect(MQTT_URL);
 
 // topic ESP32-CAM gửi chip_cam_id

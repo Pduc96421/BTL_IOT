@@ -11,7 +11,8 @@ import { io } from "../socket.io/socket";
 import { onRFIDSuccess } from "./authModeState";
 
 // const MQTT_URL = "mqtt://192.168.24.126:1883";
-const MQTT_URL = "mqtt://192.168.24.103:1883";
+// const MQTT_URL = "mqtt://192.168.24.103:1883";
+const MQTT_URL = "mqtt://172.20.10.8:1883";
 const CARD_TOPIC = "iot/rfid/card";
 const DOOR_TOPIC = "iot/door/status";
 
